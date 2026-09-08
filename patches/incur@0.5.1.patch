@@ -1,0 +1,62 @@
+--- a/src/Parser.ts
++++ b/src/Parser.ts
+@@ -331,6 +331,13 @@
+   }
+   if (typeName === 'ZodBoolean' && typeof value === 'string') {
+     return value === 'true'
++  }
++  // Preserve already-valid strings (including repeatable string flags). Decode
++  // containers only before the original schema validates their nested values.
++  if (!field.safeParse(value).success) {
++    if (typeof value === 'string') return jsonContainer(value)
++    if (typeName === 'ZodArray' && Array.isArray(value))
++      return value.flatMap((item: unknown) => typeof item === 'string' ? jsonContainer(item) : item)
+   }
+   return value
+ }
+@@ -475,3 +482,13 @@
+   }
+   return {}
+ }
++
++function jsonContainer(value: string): unknown {
++  if (!/^\s*[\[{]/.test(value)) return value
++  try {
++    return JSON.parse(value)
++  } catch (error) {
++    if (error instanceof SyntaxError) return value
++    throw error
++  }
++}
+--- a/dist/Parser.js
++++ b/dist/Parser.js
+@@ -287,6 +287,13 @@
+     if (typeName === 'ZodBoolean' && typeof value === 'string') {
+         return value === 'true';
+     }
++    // Preserve already-valid strings (including repeatable string flags). Decode
++    // containers only before the original schema validates their nested values.
++    if (!field.safeParse(value).success) {
++      if (typeof value === 'string') return jsonContainer(value)
++      if (typeName === 'ZodArray' && Array.isArray(value))
++        return value.flatMap((item) => typeof item === 'string' ? jsonContainer(item) : item)
++    }
+     return value;
+ }
+ /** Parses known global options from argv, passing unknown flags and positionals through to `rest`. */
+@@ -426,4 +433,13 @@
+     }
+     return {};
+ }
+-//# sourceMappingURL=Parser.js.map
+\ No newline at end of file
++//# sourceMappingURL=Parser.js.map
++function jsonContainer(value) {
++    if (!/^\s*[\[{]/.test(value)) return value;
++    try {
++        return JSON.parse(value);
++    } catch (error) {
++        if (error instanceof SyntaxError) return value;
++        throw error;
++    }
++}

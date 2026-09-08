@@ -10,7 +10,25 @@ the API contract and the CLI without learning a separate set of resource command
 
 ## Install
 
-From a checkout, with `nub` installed:
+Download an archive and `SHA256SUMS` from the [GitHub release](https://github.com/0xsend/bralecli/releases).
+Choose `darwin-arm64` for Apple Silicon, `darwin-x64` for Intel Macs,
+`linux-arm64` for ARM Linux, or `linux-x64` for Intel/AMD Linux.
+The Linux binaries use glibc. These executables include their runtime; Node and Nub are not required.
+
+Verify the archive against `SHA256SUMS` (`shasum -a 256` on macOS or `sha256sum`
+on Linux), then extract and install it. For example, on Apple Silicon:
+
+```sh
+tar -xzf bralecli-darwin-arm64.tar.gz
+mkdir -p ~/.local/bin
+install -m 755 bralecli ~/.local/bin/bralecli
+bralecli --version
+```
+
+The macOS binaries are not notarized. The optional `op://` credential integration
+still requires the 1Password CLI. Keep `~/.local/bin` on the shell's `PATH`.
+
+To run from a source checkout instead, with `nub` installed:
 
 ```sh
 nub install
