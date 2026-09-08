@@ -42,6 +42,63 @@ symlink is the whole install. Every example below assumes it; from a checkout
 without one, `apps/cli/src/bin.ts` invoked directly is the same thing.
 Ensure `~/.local/bin` is on your `PATH`.
 
+## Set up Claude Code and Codex
+
+After installing the CLI, run this from the project where your agent will use
+Brale:
+
+```sh
+bralecli agents install
+```
+
+This installs the curated `bralecli` skill for **both Claude Code and Codex** in
+the current project. It works offline from a standalone binary or a source
+checkout, without Brale credentials or the agent applications installed.
+
+To make it available across all your projects, or select just one agent:
+
+```sh
+bralecli agents install --global
+bralecli agents install --agent claude
+bralecli agents install --agent codex
+```
+
+| Agent       | Project installation               | Global installation                  |
+| ----------- | ---------------------------------- | ------------------------------------ |
+| Claude Code | `.claude/skills/bralecli/SKILL.md` | `~/.claude/skills/bralecli/SKILL.md` |
+| Codex       | `.agents/skills/bralecli/SKILL.md` | `~/.agents/skills/bralecli/SKILL.md` |
+
+Global Claude installs honor `CLAUDE_CONFIG_DIR`. These are the native skill
+locations documented by [Claude Code](https://code.claude.com/docs/en/skills)
+and [Codex](https://developers.openai.com/codex/skills). Installation reports the
+actual paths; add `--format json` for machine-readable results. Existing
+`AGENTS.md`, `CLAUDE.md`, and unrelated skills are preserved.
+
+Start a new agent session after installation. Ask “Use bralecli to list my Brale
+accounts,” or explicitly invoke `/bralecli` in Claude Code or `$bralecli` in
+Codex. Configure [authentication](#authentication) before making API calls.
+For a credential-free first task, ask “Use bralecli to inspect the transfer
+command schema without making an API request.”
+
+The skill covers command discovery, JSON arguments and output, credential
+references, pagination, authorization for writes, and verification. It also
+documents the current transfer idempotency limitation. Inspect the installed
+CLI directly at any time:
+
+```sh
+bralecli --llms
+bralecli create_transfer --schema --format json
+```
+
+After upgrading bralecli, rerun the same install command. Identical content is a
+no-op. If the installed skill differs, review it, then add `--force` to replace
+it with the upgraded version. The separate `skills add` command generates API
+reference skills; `agents install` supplies the curated operating guidance.
+
+Agents working in this repository also receive [AGENTS.md](AGENTS.md), imported
+by [CLAUDE.md](CLAUDE.md), and the shared
+[Brale skill](.agents/skills/bralecli/SKILL.md) without a separate install.
+
 ## Authentication
 
 Use OAuth client credentials for your own Brale application. See Brale's

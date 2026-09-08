@@ -27,6 +27,7 @@
 import { prepareSpecForCli, spec } from '@bralecli/brale'
 import { Cli } from 'incur'
 
+import { agents } from './agent-skills.js'
 import { braleFetchSource } from './client.js'
 
 export const cli = Cli.create('bralecli', {
@@ -34,4 +35,4 @@ export const cli = Cli.create('bralecli', {
   fetch: braleFetchSource(),
   openapi: prepareSpecForCli(spec),
   openapiConfig: { security: false },
-})
+}).command(agents)
