@@ -73,7 +73,15 @@ with tempfile.TemporaryDirectory(prefix='bralecli-smoke-') as cwd:
         send(messages[0]); assert 'result' in receive(1)
         send(messages[1]); send(messages[2])
         listing=receive(2)
-        assert any(t['name']=='list_accounts' for t in listing['result']['tools']), listing
+        assert any(t['name']=='search_tools' for t in listing['result']['tools']), listing
+        send({'jsonrpc':'2.0','id':3,'method':'tools/call','params':{'name':'search_tools','arguments':{'query':'list_accounts'}}})
+        found=receive(3)
+        assert not found.get('error') and not found.get('result',{}).get('isError'), found
+        assert 'list_accounts' in json.dumps(found), found
+        send({'jsonrpc':'2.0','id':4,'method':'tools/call','params':{'name':'get_tool_details','arguments':{'name':'create_transfer'}}})
+        details=receive(4)
+        assert not details.get('error') and not details.get('result',{}).get('isError'), details
+        assert 'amount' in json.dumps(details), details
     finally:
         selector.close(); process.terminate(); process.wait(timeout=5)
 
