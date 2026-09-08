@@ -204,7 +204,7 @@ function withRestoredQuery(request: Request): Request {
 }
 
 /**
- * A fetch source for the generated `api` commands: incur's own
+ * A fetch source for the generated commands: incur's own
  * `Fetch.fromRequest`, with a Bearer token minted lazily per expiry window and
  * generated bodies repaired against the spec.
  *

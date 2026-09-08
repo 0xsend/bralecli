@@ -4,7 +4,7 @@ A CLI for the [Brale](https://brale.xyz) API. Manage accounts, look up addresses
 and financial institutions, create deposits and withdrawals, and transfer
 stablecoins from your terminal.
 
-Commands live under **`api`** and are generated from the vendored Brale OpenAPI
+Commands are generated from the vendored Brale OpenAPI
 document. Command names match its `operationId` values, so you can move between
 the API contract and the CLI without learning a separate set of resource commands.
 
