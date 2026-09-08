@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "./.tsbuild",
+    "rootDir": "./src",
+    "isolatedDeclarations": false
+  },
+  "include": ["src"],
+  "references": [
+    {
+      "path": "../../packages/brale"
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"],
+    "jsx": "react-jsx",
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitReturns": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true,
+
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    // Lets tsdown emit declarations via oxc instead of the TypeScript API, which
+    // keeps the build off TypeScript 7's unstable API. Requires explicit type
+    // annotations on every exported symbol.
+    "isolatedDeclarations": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+
+    // Sibling packages resolve from src during typecheck, so `check` works on a
+    // fresh clone with no dist/ and never reads a stale build. Each package
+    // declares this condition in its own exports map, so adding a package needs
+    // no edit here. Consumers never match it: it is scope-qualified, and
+    // scripts/setup.ts rewrites the scope along with everything else.
+    "customConditions": ["@brale/source"],
+
+    "noEmit": true
+  }
+}

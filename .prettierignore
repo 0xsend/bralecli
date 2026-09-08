@@ -1,0 +1,5 @@
+# The vendored Brale OpenAPI document is a byte-for-byte copy of what upstream
+# serves, pinned by checksum in packages/brale/src/spec.ts. Reformatting it
+# changes that checksum and turns every `format --write` into a spurious
+# contract change. It is an artifact, not source.
+packages/brale/openapi/

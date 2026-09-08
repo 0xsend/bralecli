@@ -1,0 +1,21 @@
+{
+  "name": "brale",
+  "version": "0.1.0",
+  "private": true,
+  "bin": {
+    "brale": "./src/bin.ts"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "echo 'no build step'",
+    "start": "nub src/bin.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@brale/brale": "workspace:*",
+    "incur": "^0.5.1"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
+  }
+}

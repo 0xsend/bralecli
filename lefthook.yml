@@ -1,0 +1,40 @@
+pre-commit:
+  commands:
+    typecheck:
+      glob: '*.{ts,tsx}'
+      run: nub run typecheck
+    lint:
+      glob: '*.{js,ts,cjs,mjs,jsx,tsx}'
+      run: nubx oxlint --fix {staged_files}
+      stage_fixed: true
+    format:
+      glob: '*.{js,ts,cjs,mjs,jsx,tsx,json,jsonc}'
+      # --no-error-on-unmatched-pattern: when the only staged match is the
+      # .prettierignore'd vendored spec, zero targets is a clean pass, not a
+      # blocked commit on the exact workflow spec:refresh creates.
+      run: nubx oxfmt --write --no-error-on-unmatched-pattern {staged_files}
+      stage_fixed: true
+    knip:
+      glob: '*.{ts,tsx,json}'
+      run: nub run knip
+    jscpd:
+      glob: '*.{ts,tsx}'
+      run: nub run jscpd
+
+pre-push:
+  commands:
+    typecheck:
+      glob: '*.{ts,tsx}'
+      run: nub run typecheck
+    lint:
+      glob: '*.{js,ts,cjs,mjs,jsx,tsx}'
+      run: nubx oxlint {push_files}
+    format:
+      glob: '*.{js,ts,cjs,mjs,jsx,tsx,json,jsonc}'
+      run: nubx oxfmt --check --no-error-on-unmatched-pattern {push_files}
+    knip:
+      glob: '*.{ts,tsx,json}'
+      run: nub run knip
+    jscpd:
+      glob: '*.{ts,tsx}'
+      run: nub run jscpd
