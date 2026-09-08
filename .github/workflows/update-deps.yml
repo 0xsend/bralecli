@@ -1,56 +1,60 @@
 name: Update Dependencies
 
 on:
-  schedule:
-    - cron: '0 6 * * 1' # Monday 6am UTC
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: dependency-update
+  cancel-in-progress: false
 
 jobs:
   update:
-    name: Update Dependencies
+    name: Prepare dependency patch
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: DeterminateSystems/nix-installer-action@b074b4ad5f255f9c8a6a2414a2f07e7f4f2925a3
+      - uses: nubjs/setup-nub@21b317c170eee658503996209cf87b63481be35a # v0
 
-      - uses: DeterminateSystems/nix-installer-action@main
-
-      - uses: nubjs/setup-nub@v0
-
-      - name: Update .node-version to latest LTS
+      - name: Update Node LTS and dependencies
+        shell: bash
         run: |
-          LATEST_LTS=$(curl -s https://nodejs.org/dist/index.json | \
-            jq -r '[.[] | select(.lts != false)] | first | .version' | \
-            sed 's/^v//')
-          echo "$LATEST_LTS" > .node-version
-
-      - name: Update npm packages
-        run: nub update
-
-      - name: Update Nix flake inputs
-        run: nix flake update
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 30 https://nodejs.org/dist/index.json |
+            jq -er '[.[] | select(.lts != false)][0].version // error("No LTS version found")' |
+            sed 's/^v//' > .node-version
+          nub update
+          nix flake update
 
       - name: Install and verify
         run: |
           nub install
           nub run check
+          nub run build
+          nub run knip
+          nub run jscpd
 
-      - name: Build
-        run: nub run build
-
-      - name: Commit and push
+      - name: Prepare reviewable patch
+        shell: bash
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
+          git diff --binary -- .node-version nub.lock flake.lock package.json \
+            apps/cli/package.json packages/brale/package.json > "$RUNNER_TEMP/dependency-update.patch"
+          if [ -s "$RUNNER_TEMP/dependency-update.patch" ]; then
+            echo 'Download the dependency patch, review it, and apply it on a branch with git apply. Open a PR; this workflow does not push changes.' >> "$GITHUB_STEP_SUMMARY"
           else
-            git commit -m "$(cat <<'EOF'
-          chore: weekly dependency updates
-          EOF
-          )"
-            git push
+            echo 'Dependencies are already up to date; the patch is empty.' >> "$GITHUB_STEP_SUMMARY"
           fi
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dependency-update
+          path: ${{ runner.temp }}/dependency-update.patch
+          if-no-files-found: error
+          retention-days: 7

@@ -1,0 +1,36 @@
+name: Feature request
+description: Suggest a useful improvement to brale.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for sharing an idea! Start with the task you want to accomplish.
+        Use fictional examples, such as CUSD with placeholder IDs. Do not include
+        credentials, personal information, or live account, bank, wallet, or transaction data.
+  - type: textarea
+    id: outcome
+    attributes:
+      label: What would you like to accomplish?
+      description: Describe the use case and what makes it difficult today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Suggested behavior (optional)
+      description: A sample command, expected output, or alternative approach can help. It is fine to leave the implementation open.
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: How would we know it works?
+      description: Give concrete acceptance criteria, including any important error cases.
+      placeholder: |
+        - A user can...
+        - When ... fails, the CLI...
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Extra context or handoff (optional)
+      description: Related issues, constraints, or useful references for a contributor or agent picking this up. Prompt logs are not needed.
