@@ -1,0 +1,47 @@
+name: Bug report
+description: Help us reproduce and fix something that went wrong.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve brale! A small, reproducible example is ideal.
+        Use fake IDs and sanitized output. Do not include credentials, tokens,
+        personal information, or live account, bank, wallet, or transaction data.
+        You do not need to move real funds to reproduce a problem.
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: How can we reproduce it?
+      description: Include the command, relevant flags, and steps using placeholders or fixtures.
+      placeholder: |
+        1. Start with...
+        2. Run brale api ...
+        3. Observe...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened instead?
+      description: Include a short, sanitized error or output excerpt if useful.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Version and environment
+      description: Include the brale release or commit, OS, and runtime version if known. Unknown is OK.
+      placeholder: brale commit ..., macOS/Linux/Windows ..., nub version ...
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Extra context or handoff (optional)
+      description: Related issues, checks already tried and their results, or a suspected cause. Agent-assisted reports are welcome; prompt logs are not needed.

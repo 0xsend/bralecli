@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -14,62 +18,83 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: nubjs/setup-nub@v0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: nubjs/setup-nub@21b317c170eee658503996209cf87b63481be35a # v0
       - run: nub ci
       - run: nub run test
 
   typecheck:
     name: Typecheck
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: nubjs/setup-nub@v0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: nubjs/setup-nub@21b317c170eee658503996209cf87b63481be35a # v0
       - run: nub ci
       - run: nub run typecheck
 
   build:
     name: Build
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: nubjs/setup-nub@v0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: nubjs/setup-nub@21b317c170eee658503996209cf87b63481be35a # v0
       - run: nub ci
       - run: nub run build
 
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: nubjs/setup-nub@v0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: nubjs/setup-nub@21b317c170eee658503996209cf87b63481be35a # v0
       - run: nub ci
       - run: nub run lint
 
   format:
     name: Format Check
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: nubjs/setup-nub@v0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: nubjs/setup-nub@21b317c170eee658503996209cf87b63481be35a # v0
       - run: nub ci
       - run: nub run format:check
 
   knip:
     name: Unused Dependencies
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: nubjs/setup-nub@v0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: nubjs/setup-nub@21b317c170eee658503996209cf87b63481be35a # v0
       - run: nub ci
       - run: nub run knip
 
   jscpd:
     name: Code Duplication
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: nubjs/setup-nub@v0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: nubjs/setup-nub@21b317c170eee658503996209cf87b63481be35a # v0
       - run: nub ci
       - run: nub run jscpd
