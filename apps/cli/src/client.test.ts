@@ -168,7 +168,7 @@ describe('braleFetchSource', () => {
 
   it('re-parses contract-declared container flags before the body leaves the process', async () => {
     // What incur's generated handler actually produces for
-    // `api create_transfer --source '{...}'`: the object flag survives as a
+    // `create_transfer --source '{...}'`: the object flag survives as a
     // JSON *string*, which Brale rejects on every create.
     await braleFetchSource().fetch(
       generatedRequest({
