@@ -1,0 +1,13 @@
+name: Setup nub
+description: Install the project Node version and an exact nub release without unpinned composite dependencies.
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      with:
+        node-version-file: .node-version
+    - name: Install nub
+      shell: bash
+      run: |
+        npm install --global --ignore-scripts --no-audit --no-fund @nubjs/nub@0.5.0
+        nub --version

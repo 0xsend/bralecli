@@ -21,7 +21,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: DeterminateSystems/nix-installer-action@b074b4ad5f255f9c8a6a2414a2f07e7f4f2925a3
-      - uses: nubjs/setup-nub@21b317c170eee658503996209cf87b63481be35a # v0
+      - uses: ./.github/actions/setup-nub
 
       - name: Update Node LTS and dependencies
         shell: bash

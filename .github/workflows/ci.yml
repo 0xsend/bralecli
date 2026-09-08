@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - uses: nubjs/setup-nub@21b317c170eee658503996209cf87b63481be35a # v0
+      - uses: ./.github/actions/setup-nub
       - run: nub ci
       - run: nub run test
 
@@ -35,7 +35,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - uses: nubjs/setup-nub@21b317c170eee658503996209cf87b63481be35a # v0
+      - uses: ./.github/actions/setup-nub
       - run: nub ci
       - run: nub run typecheck
 
@@ -47,7 +47,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - uses: nubjs/setup-nub@21b317c170eee658503996209cf87b63481be35a # v0
+      - uses: ./.github/actions/setup-nub
       - run: nub ci
       - run: nub run build
 
@@ -59,9 +59,10 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - uses: nubjs/setup-nub@21b317c170eee658503996209cf87b63481be35a # v0
+      - uses: ./.github/actions/setup-nub
       - run: nub ci
       - run: nub run lint
+      - run: nub run actions:check
 
   format:
     name: Format Check
@@ -71,7 +72,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - uses: nubjs/setup-nub@21b317c170eee658503996209cf87b63481be35a # v0
+      - uses: ./.github/actions/setup-nub
       - run: nub ci
       - run: nub run format:check
 
@@ -83,7 +84,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - uses: nubjs/setup-nub@21b317c170eee658503996209cf87b63481be35a # v0
+      - uses: ./.github/actions/setup-nub
       - run: nub ci
       - run: nub run knip
 
@@ -95,6 +96,6 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - uses: nubjs/setup-nub@21b317c170eee658503996209cf87b63481be35a # v0
+      - uses: ./.github/actions/setup-nub
       - run: nub ci
       - run: nub run jscpd

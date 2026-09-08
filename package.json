@@ -20,7 +20,8 @@
     "spec:refresh": "nub scripts/refresh-spec.ts",
     "changeset": "changeset",
     "version": "changeset version",
-    "release": "nub run build && changeset publish"
+    "release": "nub run build && changeset publish",
+    "actions:check": "nub scripts/check-actions.ts"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.1",

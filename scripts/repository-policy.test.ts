@@ -37,7 +37,9 @@ describe('repository automation trust boundaries', () => {
         expect(job.permissions ?? config.permissions).toEqual({ contents: 'read' })
         for (const step of job.steps) {
           if (!step.uses) continue
-          expect(step.uses).toMatch(/^[\w.-]+\/[\w.-]+@[a-f0-9]{40}$/)
+          expect(step.uses).toMatch(
+            /^(?:[\w.-]+\/[\w.-]+@[a-f0-9]{40}|\.\/\.github\/actions\/[\w-]+)$/,
+          )
           if (step.uses.startsWith('actions/checkout@')) {
             expect(step.with?.['persist-credentials']).toBe(false)
           }
