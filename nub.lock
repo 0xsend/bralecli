@@ -41,7 +41,7 @@ importers:
 
   apps/cli:
     dependencies:
-      '@brale/brale':
+      '@bralecli/brale':
         specifier: workspace:*
         version: link:../../packages/brale
       incur:

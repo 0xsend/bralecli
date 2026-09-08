@@ -1,9 +1,9 @@
 {
-  "name": "brale",
+  "name": "bralecli",
   "version": "0.1.0",
   "private": true,
   "bin": {
-    "brale": "./src/bin.ts"
+    "bralecli": "./src/bin.ts"
   },
   "type": "module",
   "scripts": {
@@ -12,7 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@brale/brale": "workspace:*",
+    "@bralecli/brale": "workspace:*",
     "incur": "^0.5.1"
   },
   "devDependencies": {

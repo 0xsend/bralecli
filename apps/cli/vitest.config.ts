@@ -6,7 +6,7 @@ import { defineConfig } from 'vitest/config'
  * a fully green tree. The condition mirrors the root config: workspace
  * packages resolve from `src`, never a stale `dist/`.
  */
-const conditions = ['@brale/source']
+const conditions = ['@bralecli/source']
 
 export default defineConfig({
   resolve: { conditions },

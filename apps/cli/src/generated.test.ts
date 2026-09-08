@@ -1,4 +1,4 @@
-import { prepareSpecForCli, spec } from '@brale/brale'
+import { prepareSpecForCli, spec } from '@bralecli/brale'
 import { Openapi } from 'incur'
 import { describe, expect, it } from 'vitest'
 

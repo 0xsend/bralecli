@@ -1,5 +1,5 @@
 /**
- * brale — a CLI for the Brale API.
+ * bralecli — a CLI for the Brale API.
  *
  * The generated `api` surface is the product: every operation in the vendored
  * OpenAPI document, typed, named by its `operationId` (Brale declares one on
@@ -24,12 +24,12 @@
  * learns to, a credential flag is a credential leaked to shell history, `ps`,
  * and every agent transcript.
  */
-import { prepareSpecForCli, spec } from '@brale/brale'
+import { prepareSpecForCli, spec } from '@bralecli/brale'
 import { Cli } from 'incur'
 
 import { braleFetchSource } from './client.js'
 
-export const cli = Cli.create('brale', {
+export const cli = Cli.create('bralecli', {
   description: 'CLI for the Brale API',
 }).command('api', {
   description: 'Every operation in the Brale OpenAPI document, named by operationId',

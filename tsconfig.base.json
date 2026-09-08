@@ -32,7 +32,7 @@
     // declares this condition in its own exports map, so adding a package needs
     // no edit here. Consumers never match it: it is scope-qualified, and
     // scripts/setup.ts rewrites the scope along with everything else.
-    "customConditions": ["@brale/source"],
+    "customConditions": ["@bralecli/source"],
 
     "noEmit": true
   }

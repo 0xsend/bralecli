@@ -1,4 +1,4 @@
-# @brale/brale
+# @bralecli/brale
 
 ## 0.1.0
 

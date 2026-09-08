@@ -1,4 +1,4 @@
-# brale
+# bralecli
 
 A CLI for the [Brale](https://brale.xyz) API. Manage accounts, look up addresses
 and financial institutions, create deposits and withdrawals, and transfer
@@ -16,7 +16,7 @@ From a checkout, with `nub` installed:
 nub install
 nub run build
 mkdir -p ~/.local/bin
-ln -s "$(pwd)/apps/cli/src/bin.ts" ~/.local/bin/brale
+ln -s "$(pwd)/apps/cli/src/bin.ts" ~/.local/bin/bralecli
 ```
 
 The bin is directly executable — its shebang runs it through `nub` — so the
@@ -52,7 +52,7 @@ vault (replace the example vault, item, and field names):
 ```sh
 export BRALE_CLIENT_ID_REF='op://your-vault/brale/client-id'
 export BRALE_CLIENT_SECRET_REF='op://your-vault/brale/client-secret'
-brale api list_accounts
+bralecli api list_accounts
 ```
 
 Alternatively, have your secret manager or CI environment inject
@@ -89,12 +89,12 @@ a creation command after an uncertain result.
 ### Find accounts, addresses, and bank accounts
 
 ```sh
-brale api --help
-brale api list_accounts
-brale api get_account <account-id>
-brale api list_account_addresses <account-id>
-brale api list_account_financial_institutions <account-id>
-brale api create_transfer --help
+bralecli api --help
+bralecli api list_accounts
+bralecli api get_account <account-id>
+bralecli api list_account_addresses <account-id>
+bralecli api list_account_financial_institutions <account-id>
+bralecli api create_transfer --help
 ```
 
 ### Deposit USD by wire to receive stablecoins
@@ -102,7 +102,7 @@ brale api create_transfer --help
 Create an on-ramp transfer for 10 USD to an existing Brale address:
 
 ```sh
-brale api create_transfer <account-id> \
+bralecli api create_transfer <account-id> \
   --amount '{"value":"10","currency":"USD"}' \
   --source '{"value_type":"USD","transfer_type":"wire"}' \
   --destination '{"value_type":"CUSD","transfer_type":"base","address_id":"<destination-address-id>"}'
@@ -120,7 +120,7 @@ address ID of a registered bank account that supports wire payouts and a funded
 source address eligible to initiate transfers through Brale:
 
 ```sh
-brale api create_transfer <account-id> \
+bralecli api create_transfer <account-id> \
   --amount '{"value":"10","currency":"USD"}' \
   --source '{"value_type":"CUSD","transfer_type":"base","address_id":"<source-address-id>"}' \
   --destination '{"value_type":"USD","transfer_type":"wire","address_id":"<bank-address-id>"}'
@@ -132,23 +132,23 @@ Use a funded source address eligible to initiate transfers through Brale and
 a recipient address registered with Brale:
 
 ```sh
-brale api create_transfer <account-id> \
+bralecli api create_transfer <account-id> \
   --amount '{"value":"10","currency":"USD"}' \
   --source '{"value_type":"CUSD","transfer_type":"base","address_id":"<source-address-id>"}' \
   --destination '{"value_type":"CUSD","transfer_type":"base","address_id":"<destination-address-id>"}'
 ```
 
 To register a new recipient wallet, inspect the required fields with
-`brale api create_external_address --help`.
+`bralecli api create_external_address --help`.
 
 ### Track a deposit, withdrawal, or transfer
 
 Save the transfer `id` returned by `create_transfer`, then retrieve its status:
 
 ```sh
-brale api get_transfer <account-id> <transfer-id>
-brale api list_transfers <account-id> --page_size 50
-brale api list_transfers <account-id> --page_size 50 --page_after <cursor>
+bralecli api get_transfer <account-id> <transfer-id>
+bralecli api list_transfers <account-id> --page_size 50
+bralecli api list_transfers <account-id> --page_size 50 --page_after <cursor>
 ```
 
 Use a cursor from the list response for the next page. A successful creation
