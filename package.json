@@ -34,5 +34,8 @@
     "typescript": "^7.0.2",
     "vitest": "^3.2.7",
     "yaml": "^2.9.0"
+  },
+  "patchedDependencies": {
+    "incur@0.5.1": "patches/incur@0.5.1.patch"
   }
 }

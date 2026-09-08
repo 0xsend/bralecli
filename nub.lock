@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  incur@0.5.1:
+    hash: 4b50a76f48bf8f3d82f244c5fe16d8ada795000d9bc9fd9497d547d803080f65
+    path: patches/incur@0.5.1.patch
+
 importers:
 
   .:
@@ -45,8 +50,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/brale
       incur:
-        specifier: ^0.5.1
-        version: 0.5.1
+        specifier: 0.5.1
+        version: 0.5.1(patch_hash=4b50a76f48bf8f3d82f244c5fe16d8ada795000d9bc9fd9497d547d803080f65)
     devDependencies:
       vitest:
         specifier: ^3.2.4
@@ -3171,7 +3176,7 @@ snapshots:
 
   import-without-cache@0.4.0: {}
 
-  incur@0.5.1:
+  incur@0.5.1(patch_hash=4b50a76f48bf8f3d82f244c5fe16d8ada795000d9bc9fd9497d547d803080f65):
     dependencies:
       '@cfworker/json-schema': 4.1.1
       '@modelcontextprotocol/server': 2.0.0-alpha.4

@@ -1,6 +1,6 @@
 {
   "name": "bralecli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "bin": {
     "bralecli": "./src/bin.ts"
@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@bralecli/brale": "workspace:*",
-    "incur": "^0.5.1"
+    "incur": "0.5.1"
   },
   "devDependencies": {
     "vitest": "^3.2.4"
