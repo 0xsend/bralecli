@@ -1,6 +1,6 @@
-# Contributing to brale
+# Contributing to bralecli
 
-Thanks for helping improve brale! Bug reports, documentation fixes, and features
+Thanks for helping improve bralecli! Bug reports, documentation fixes, and features
 are welcome, including work assisted by coding agents.
 
 Start with an issue for a substantial change so maintainers can help confirm the

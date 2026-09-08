@@ -16,7 +16,7 @@ import {
   coerceJsonBodyText,
   restoreObjectQueryParameters,
   spec,
-} from '@brale/brale'
+} from '@bralecli/brale'
 import { Errors, Fetch } from 'incur'
 
 import {

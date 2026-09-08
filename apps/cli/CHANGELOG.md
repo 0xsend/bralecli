@@ -1,4 +1,4 @@
-# brale
+# bralecli
 
 ## 0.1.0
 
@@ -11,4 +11,4 @@
 ### Patch Changes
 
 - Updated dependencies
-  - @brale/brale@0.1.0
+  - @bralecli/brale@0.1.0

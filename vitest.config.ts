@@ -9,7 +9,7 @@ import { defineConfig } from 'vitest/config'
  * Vite's SSR pipeline, which resolves with `ssr.resolve.conditions` and ignores
  * the client-side list.
  */
-const conditions = ['@brale/source']
+const conditions = ['@bralecli/source']
 
 export default defineConfig({
   resolve: { conditions },

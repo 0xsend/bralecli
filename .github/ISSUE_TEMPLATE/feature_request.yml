@@ -1,5 +1,5 @@
 name: Feature request
-description: Suggest a useful improvement to brale.
+description: Suggest a useful improvement to bralecli.
 body:
   - type: markdown
     attributes:

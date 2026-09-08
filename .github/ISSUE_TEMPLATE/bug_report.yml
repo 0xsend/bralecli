@@ -4,7 +4,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for helping improve brale! A small, reproducible example is ideal.
+        Thanks for helping improve bralecli! A small, reproducible example is ideal.
         Use fake IDs and sanitized output. Do not include credentials, tokens,
         personal information, or live account, bank, wallet, or transaction data.
         You do not need to move real funds to reproduce a problem.
@@ -15,7 +15,7 @@ body:
       description: Include the command, relevant flags, and steps using placeholders or fixtures.
       placeholder: |
         1. Start with...
-        2. Run brale api ...
+        2. Run bralecli api ...
         3. Observe...
     validations:
       required: true
@@ -36,8 +36,8 @@ body:
     id: environment
     attributes:
       label: Version and environment
-      description: Include the brale release or commit, OS, and runtime version if known. Unknown is OK.
-      placeholder: brale commit ..., macOS/Linux/Windows ..., nub version ...
+      description: Include the bralecli release or commit, OS, and runtime version if known. Unknown is OK.
+      placeholder: bralecli commit ..., macOS/Linux/Windows ..., nub version ...
     validations:
       required: true
   - type: textarea
