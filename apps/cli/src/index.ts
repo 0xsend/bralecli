@@ -1,16 +1,16 @@
 /**
  * bralecli — a CLI for the Brale API.
  *
- * The generated `api` surface is the product: every operation in the vendored
+ * The generated command surface is the product: every operation in the vendored
  * OpenAPI document, typed, named by its `operationId` (Brale declares one on
- * every operation, so commands match the docs verbatim: `api create_transfer`,
- * `api list_accounts`). Application-specific reconciliation belongs to the
+ * every operation, so commands match the docs verbatim: `create_transfer`,
+ * `list_accounts`). Application-specific reconciliation belongs to the
  * consuming application; this CLI exposes the Brale API contract.
  *
  * `constrainPathParameters` is not cosmetic: the generator interpolates path
  * arguments verbatim, and every path parameter in Brale's document is a
  * `$ref` to an `ID` schema that declares no pattern at all — so without the
- * constraint, `api get_transfer '../other'` retargets the request after URL
+ * constraint, `get_transfer '../other'` retargets the request after URL
  * normalization.
  *
  * The same preparation flattens object-valued query parameters into scalar
@@ -31,8 +31,6 @@ import { braleFetchSource } from './client.js'
 
 export const cli = Cli.create('bralecli', {
   description: 'CLI for the Brale API',
-}).command('api', {
-  description: 'Every operation in the Brale OpenAPI document, named by operationId',
   fetch: braleFetchSource(),
   openapi: prepareSpecForCli(spec),
   openapiConfig: { security: false },
