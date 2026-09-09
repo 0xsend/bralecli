@@ -5,10 +5,10 @@
   "reporters": ["console"],
   "format": ["typescript", "tsx", "javascript", "jsx"],
   "ignore": [
-    "node_modules",
-    "dist",
-    "build",
-    "coverage",
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/coverage/**",
     "**/*.d.ts",
     "**/*.test.ts",
     "**/*.spec.ts"

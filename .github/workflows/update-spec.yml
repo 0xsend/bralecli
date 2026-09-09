@@ -21,14 +21,15 @@ jobs:
     outputs:
       changed: ${{ steps.refresh.outputs.changed }}
       hash: ${{ steps.refresh.outputs.hash }}
-      verification: ${{ steps.verify.outcome }}
+      artifact-id: ${{ steps.artifact.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - uses: ./.github/actions/setup-nub
-      - run: nub ci
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
 
       - name: Read previous proposal pin
         env:
@@ -50,7 +51,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          nub scripts/refresh-spec.ts --update-pin --format json \
+          node scripts/refresh-spec.ts --update-pin --format json \
             --previous-pin "$RUNNER_TEMP/previous-pin.ts" > "$RUNNER_TEMP/spec-refresh.json"
           changed=$(jq -er '.changed | tostring' "$RUNNER_TEMP/spec-refresh.json")
           hash=$(jq -er '.hash' "$RUNNER_TEMP/spec-refresh.json")
@@ -60,26 +61,11 @@ jobs:
           if [ "$changed" = true ]; then
             mkdir -p "$RUNNER_TEMP/spec-update"
             cp packages/brale/openapi/brale.json "$RUNNER_TEMP/spec-update/brale.json"
-            cp packages/brale/src/spec.ts "$RUNNER_TEMP/spec-update/spec.ts"
+            cp "$RUNNER_TEMP/spec-refresh.json" "$RUNNER_TEMP/spec-update/revision.json"
           fi
 
-      - name: Check compatibility
-        id: verify
-        if: steps.refresh.outputs.changed == 'true'
-        continue-on-error: true
-        run: |
-          nub run check
-          nub run build
-          nub run knip
-          nub run jscpd
-
-      - name: Report compatibility
-        if: steps.refresh.outputs.changed == 'true'
-        env:
-          VERIFICATION: ${{ steps.verify.outcome }}
-        run: echo "Compatibility checks $VERIFICATION. Failed checks require maintainer fixes; the changed spec still receives a draft PR." >> "$GITHUB_STEP_SUMMARY"
-
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        id: artifact
         if: steps.refresh.outputs.changed == 'true'
         with:
           name: brale-spec-update
@@ -87,10 +73,37 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  pull-request:
-    name: Propose spec update
+  compatibility:
+    name: Check proposed contract
     needs: prepare
     if: needs.prepare.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    outputs:
+      checks: ${{ steps.verify.outcome }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          artifact-ids: ${{ needs.prepare.outputs.artifact-id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/spec-update
+      - name: Validate and apply proposed data
+        run: node scripts/apply-spec-proposal.ts --proposal-dir "$RUNNER_TEMP/spec-update"
+      - name: Check compatibility in isolation
+        id: verify
+        run: node scripts/ci-sandbox.mjs compatibility
+
+  pull-request:
+    name: Propose spec update
+    needs: [prepare, compatibility]
+    if: ${{ !cancelled() && needs.prepare.result == 'success' && needs.prepare.outputs.changed == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -101,14 +114,16 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: brale-spec-update
+          artifact-ids: ${{ needs.prepare.outputs.artifact-id }}
+          merge-multiple: true
           path: ${{ runner.temp }}/spec-update
-      - name: Copy the proposed contract
-        run: |
-          install -m 644 "$RUNNER_TEMP/spec-update/brale.json" packages/brale/openapi/brale.json
-          install -m 644 "$RUNNER_TEMP/spec-update/spec.ts" packages/brale/src/spec.ts
+      - name: Validate data and reconstruct trusted pin
+        run: node scripts/apply-spec-proposal.ts --proposal-dir "$RUNNER_TEMP/spec-update"
       - name: Create or update draft PR
         id: proposal
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
@@ -128,10 +143,17 @@ jobs:
 
             Upstream SHA-256: `${{ needs.prepare.outputs.hash }}`
 
-            Compatibility check sequence: **${{ needs.prepare.outputs.verification }}**.
-            The sequence runs `nub run check`, `nub run build`, `nub run knip`, and
-            `nub run jscpd`, stopping at the first failure. Later checks after a
-            failure are NOT RUN. Inspect the [run logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for results.
+            Compatibility job: **${{ needs.compatibility.result }}**.
+            Container step: **${{ needs.compatibility.outputs.checks || 'NOT RUN' }}**.
+            The intended sequence is `nub run check`, `nub run build`, `nub run knip`,
+            and `nub run jscpd`, stopping at the first failure. Setup, download,
+            validation, or container startup failures mean checks are NOT RUN.
+            Later checks after a failure are NOT RUN. Inspect the [run logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for the commands actually started and their results.
+
+            Preparation installs no project dependencies. Compatibility runs on a
+            separate runner in a credential-free, offline container. The publisher
+            validates the preparation artifact and reconstructs the pin from trusted
+            source; compatibility code cannot replace the proposed files.
 
             Review the contract diff and resolve any failed checks before marking
             this ready. Approve pending PR workflows if offered, or manually run

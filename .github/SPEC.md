@@ -18,7 +18,8 @@ updating the default branch.
   bounded timeouts, commit-pinned actions, and checkout without persisted credentials.
   Fork workflows receive no write tokens or secrets. Only the spec PR job receives
   contents and pull-requests write permissions; it does not install dependencies
-  or execute repository scripts or the refreshed spec.
+  or execute project checks or the refreshed spec. Its builtin-only validator
+  runs from the trusted main revision selected when the workflow started.
 - REQ-REPO-004: The default branch requires a PR, one code-owner approval from
   someone other than the latest pusher, dismissal of stale approvals, resolved
   review threads, and all seven CI checks on up-to-date code. No bypass actors,
@@ -38,6 +39,18 @@ updating the default branch.
   compatibility checks and opens a draft even when those checks fail, so upstream
   changes remain visible. Fetch/preparation failures do not publish a proposal.
   Package versions and releases are separate maintainer decisions.
+- REQ-REPO-008: Preparation installs no project dependencies and uploads only
+  raw spec bytes and revision metadata. Compatibility runs in a separate job.
+  The publisher downloads the preparation artifact by immutable ID, rejects
+  unexpected files, symlinks, oversized/invalid data and inconsistent hashes,
+  and reconstructs only SHA/date literals against its trusted pin source.
+  Compatibility cannot replace the artifact or supply executable pin source.
+- REQ-REPO-009: CI and spec compatibility execute project checks in fresh,
+  bounded containers without runner credentials, host mounts or outbound network.
+  A separate dependency-download container skips lifecycle scripts. Source comes
+  from tracked working-tree files without Git metadata or local credentials.
+  Untrusted logs cannot issue Actions workflow commands. Exit status determines
+  success. The action-manifest audit requires a separate networked container.
 
 ## Invariants and non-goals
 
@@ -47,6 +60,15 @@ forks are outside this repository's control. Maintainers inspect outside changes
 before bringing them onto a repository branch for CI. There is no package
 publication or deployment workflow. Repository visibility and licensing do not
 change as part of these protections.
+
+The isolation assumes reviewed workflow, runner and publisher definitions. The
+Docker verifier (`scripts/ci-sandbox.test.mjs`) also executes on the host and is
+trusted infrastructure. A maintainer who changes those definitions can remove
+isolation; repository policy and independent review remain the external
+enforcement boundary. Containers share the hosted runner's
+kernel and are not a guarantee against container/runtime vulnerabilities. The
+manual **Update Dependencies** workflow still uses host tools and is outside
+REQ-REPO-009; maintainers review its main-branch inputs before running it.
 
 ## Acceptance and traceability
 
@@ -61,6 +83,11 @@ change as part of these protections.
 - [ ] REQ-REPO-006/007: A manual Actions run verifies the published workflow;
       native-token PR creation is enabled in repository settings. Maintainers approve
       bot-triggered PR workflow runs or dispatch CI on the bot branch before merging.
+- [ ] REQ-REPO-008: Artifact integration tests reject hostile files/metadata without
+      changing trusted files; workflow tests prove separate jobs and artifact IDs.
+- [ ] REQ-REPO-009: The Docker adversarial verifier proves credential/host isolation,
+      blocked outbound access, working loopback, skipped lifecycle scripts and
+      failure propagation. Compatibility passes inside the same container runner.
 
 ## Decisions
 
@@ -69,6 +96,12 @@ change as part of these protections.
 - 2026-09-08, provisional: native `GITHUB_TOKEN` avoids a new long-lived secret;
   preparation runs separately from the writer. Spec revision means raw bytes and
   their pin, because the upstream version string does not reliably change.
+- 2026-09-09, ratified by request: isolate compatibility from proposal preparation,
+  reconstruct the published pin from trusted source, and isolate CI project code
+  from runner credentials and outbound network access.
+- 2026-09-09, provisional: the action-manifest audit retains credential-free
+  network access because it reads remote action definitions; the manual dependency
+  patch workflow is a separate maintainer-operated surface.
 
 Risk: authorization and CI configuration. Applying repository rules is an
 administrator operation; changes are reviewed before activation.

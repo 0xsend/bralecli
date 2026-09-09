@@ -41,6 +41,23 @@ The default branch requires a code-owner review and passing checks. Updates afte
 review may require another approval. Agent-generated changes follow the same
 review process as any other contribution.
 
+CI runs project checks in disposable Docker containers. Dependency installation
+skips lifecycle scripts in a separate container; checks run without outbound
+networking, runner credentials, or host mounts. Local HTTP fixtures still work.
+Use `node scripts/ci-sandbox.mjs compatibility` to run the complete compatibility
+sequence, or pass an individual package script such as `test` or `build`. Docker
+must be running. The runner snapshots tracked working-tree files; add new files
+to Git before running it. Run `node --test scripts/ci-sandbox.test.mjs` to exercise
+the isolation boundaries. These commands require the Node version in `.node-version`.
+
+The `actions:check` audit runs in a separate credential-free container with network
+access to fetch action manifests. The manual **Update Dependencies** workflow
+uses host tools and does not have the CI container isolation. The sandbox runner
+and its verifier (`scripts/ci-sandbox.test.mjs`) run on the host to control Docker;
+they are trusted infrastructure. Changes to those files, workflows, or the
+publisher's scripts require careful maintainer review: code that replaces these
+definitions can remove their protections.
+
 Maintainers can manually run **Update Dependencies** on `main` to obtain a patch
 artifact. Review it, apply it on a branch with `git apply dependency-update.patch`,
 and open a PR. The workflow does not push or merge dependency changes.
@@ -48,11 +65,13 @@ and open a PR. The workflow does not push or merge dependency changes.
 ## Daily spec updates
 
 **Update Brale Spec** checks upstream daily at 08:23 UTC (GitHub schedules may
-be delayed) and supports manual runs on `main`. Its read-only job downloads the
-spec, updates its pin, and runs compatibility checks. A separate job opens or
-updates the draft PR on `automation/brale-spec`. Failed compatibility checks
-remain visible in the PR; they do not suppress the proposal. The publishing
-job copies only the spec and pin, without installing or running project code.
+be delayed) and supports manual runs on `main`. Preparation downloads the spec
+without installing project dependencies and uploads its raw bytes and revision
+metadata. A separate job checks compatibility in the CI container. The publisher
+validates the immutable preparation artifact and reconstructs the pin from its
+trusted main checkout, then opens or updates the draft PR on
+`automation/brale-spec`. It never accepts executable source from the artifact.
+Failed compatibility checks remain visible in the PR and do not suppress it.
 
 To activate the workflow after merging it to `main`:
 
