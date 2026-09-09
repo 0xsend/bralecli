@@ -45,13 +45,17 @@ describe('repository automation trust boundaries', () => {
       expect(config.permissions).toEqual({ contents: 'read' })
       expect(Object.keys(config.jobs).length).toBeGreaterThan(0)
       for (const [id, job] of Object.entries(config.jobs)) {
-        expect(job['runs-on']).toBe('ubuntu-latest')
+        expect(job['runs-on']).toBe(
+          name === 'release' && id === 'build' ? '${{ matrix.runner }}' : 'ubuntu-latest',
+        )
         expect(job['timeout-minutes']).toBeGreaterThan(0)
         expect(job['timeout-minutes']).toBeLessThanOrEqual(30)
         expect(job.permissions ?? config.permissions).toEqual(
           name === 'update-spec' && id === 'pull-request'
             ? { contents: 'write', 'pull-requests': 'write' }
-            : { contents: 'read' },
+            : name === 'release' && id === 'draft'
+              ? { contents: 'write' }
+              : { contents: 'read' },
         )
         for (const step of job.steps) {
           if (!step.uses) continue
@@ -160,7 +164,7 @@ describe('repository automation trust boundaries', () => {
     }
   })
 
-  it('only the spec writer can publish and it handles two files without executing the artifact', () => {
+  it('the spec writer proposes four trusted paths without executing the artifact', () => {
     const job = workflow('update-spec').jobs['pull-request']!
     const proposal = job.steps.find((step) =>
       step.uses?.startsWith('peter-evans/create-pull-request@'),
@@ -169,7 +173,7 @@ describe('repository automation trust boundaries', () => {
     expect(proposal?.with?.base).toBe('main')
     expect(proposal?.with?.draft).toBe('always-true')
     expect(proposal?.with?.['add-paths']).toBe(
-      'packages/brale/openapi/brale.json\npackages/brale/src/spec.ts\n',
+      'packages/brale/openapi/brale.json\npackages/brale/src/spec.ts\napps/cli/package.json\napps/cli/CHANGELOG.md\n',
     )
     expect(proposal?.with?.['branch-suffix']).toBeUndefined()
     expect(proposal?.with?.['maintainer-can-modify']).toBe(false)
@@ -186,5 +190,56 @@ describe('repository automation trust boundaries', () => {
     expect(commands).not.toContain('spec-update/spec.ts')
     expect(commands).not.toMatch(/\b(?:nub|npm|npx|bun|source|eval)\b|gh\s+pr\s+(merge|review)/)
     expect(proposal?.with?.body).toContain('${{ needs.compatibility.result }}')
+  })
+
+  it('release preparation is confined to main with four native jobs before its isolated draft writer', () => {
+    const config = workflow('release')
+    expect(Object.keys(config.on).toSorted()).toEqual(['push', 'workflow_dispatch'])
+    expect(config.on.push).toEqual({ branches: ['main'] })
+    expect(config.jobs.candidate?.if).toBe(
+      "github.repository == '0xsend/bralecli' && github.ref == 'refs/heads/main'",
+    )
+    expect(config.concurrency).toEqual({
+      group: 'release-preparation',
+      'cancel-in-progress': false,
+    })
+    expect(config.jobs.build?.needs).toBe('candidate')
+    expect(config.jobs.build?.if).toBe("needs.candidate.outputs.prepare == 'true'")
+    const raw = parse(
+      readFileSync(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8'),
+    )
+    expect(raw.jobs.build.strategy.matrix.include).toEqual([
+      { platform: 'darwin-arm64', runner: 'macos-15' },
+      { platform: 'darwin-x64', runner: 'macos-15-intel' },
+      { platform: 'linux-arm64', runner: 'ubuntu-24.04-arm' },
+      { platform: 'linux-x64', runner: 'ubuntu-24.04' },
+    ])
+    const build = config.jobs.build!.steps.map((step) => step.run ?? '').join('\n')
+    expect(build).toContain('nub ci --ignore-scripts')
+    expect(build).toContain('nub run check')
+    expect(build).toContain('scripts/smoke-binary.py')
+    expect(build).toContain('scripts/release-artifacts.ts package')
+    const job = config.jobs.draft!
+    expect(job.needs).toEqual(['candidate', 'build'])
+    expect(job.permissions).toEqual({ contents: 'write' })
+    expect(job.steps.map((step) => step.run ?? '').join('\n')).toContain(
+      'scripts/release-draft.ts upload',
+    )
+    expect(job.steps.map((step) => step.run ?? '').join('\n')).not.toMatch(
+      /\b(?:npm|nub|bun|npx|python3)\b|--draft=false/,
+    )
+    const download = job.steps.find((step) => step.uses?.startsWith('actions/download-artifact@'))
+    expect(download?.with?.pattern).toBe('release-${{ github.run_id }}-*')
+    const upload = config.jobs.build!.steps.find((step) =>
+      step.uses?.startsWith('actions/upload-artifact@'),
+    )
+    expect(upload?.with?.name).toBe('release-${{ github.run_id }}-${{ matrix.platform }}')
+    expect(upload?.with?.overwrite).toBe(true)
+    expect(download?.with?.['run-id']).toBeUndefined()
+    for (const current of Object.values(config.jobs)) {
+      expect(
+        current.steps.find((step) => step.uses?.startsWith('actions/checkout@'))?.with?.ref,
+      ).toBe('${{ github.sha }}')
+    }
   })
 })

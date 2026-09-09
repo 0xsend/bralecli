@@ -8,7 +8,7 @@
   "type": "module",
   "scripts": {
     "build": "nub run -r --filter './packages/*' build && nub run -r --filter './apps/*' build",
-    "typecheck": "tsc -b",
+    "typecheck": "tsc -b && tsc -p scripts/tsconfig.json",
     "lint": "oxlint .",
     "lint:fix": "oxlint --fix .",
     "format": "oxfmt --write .",

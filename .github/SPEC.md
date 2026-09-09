@@ -16,8 +16,9 @@ updating the default branch.
   platform limitation, not an authorization granted by this repository.
 - REQ-REPO-003: Workflows default to read-only contents permissions, hosted runners,
   bounded timeouts, commit-pinned actions, and checkout without persisted credentials.
-  Fork workflows receive no write tokens or secrets. Only the spec PR job receives
-  contents and pull-requests write permissions; it does not install dependencies
+  Fork workflows receive no write tokens or secrets. The spec PR job receives
+  contents and pull-requests write permissions; the release draft job receives
+  contents write permission. Neither writer installs dependencies
   or execute project checks or the refreshed spec. Its builtin-only validator
   runs from the trusted main revision selected when the workflow started.
 - REQ-REPO-004: The default branch requires a PR, one code-owner approval from
@@ -35,10 +36,10 @@ updating the default branch.
   manual review. Invalid responses fail before writing files.
 - REQ-REPO-007: One dedicated branch, `automation/brale-spec`, holds the latest
   spec proposal. A repeated upstream revision preserves its prior fetch date.
-  Only the vendored document and pin file enter its PR. The updater reports
+  Only the vendored document, pin, CLI package version and changelog enter its PR. The updater reports
   compatibility checks and opens a draft even when those checks fail, so upstream
   changes remain visible. Fetch/preparation failures do not publish a proposal.
-  Package versions and releases are separate maintainer decisions.
+  Version proposals require maintainer review; public releases require publication.
 - REQ-REPO-008: Preparation installs no project dependencies and uploads only
   raw spec bytes and revision metadata. Compatibility runs in a separate job.
   The publisher downloads the preparation artifact by immutable ID, rejects
@@ -51,14 +52,44 @@ updating the default branch.
   from tracked working-tree files without Git metadata or local credentials.
   Untrusted logs cannot issue Actions workflow commands. Exit status determines
   success. The action-manifest audit requires a separate networked container.
+- REQ-REPO-010: Validated spec proposals include a CLI version and changelog
+  proposal when the semantic contract changes. Whitespace and known annotation
+  changes alone do not bump versions. Schema property names and payload values
+  remain meaningful. Automated proposals conservatively increment the minor
+  version before 1.0 and the major version thereafter; reviewers can adjust the
+  proposal after assessing compatibility. The writer derives these files from
+  trusted main, never accepts executable files or release metadata from upstream,
+  and repeated proposals against the same base are identical.
+- REQ-REPO-011: A release workflow on canonical-main pushes and manual dispatch
+  checks the CLI version for a pending release. Four separate read-only jobs build
+  and smoke-test darwin-arm64, darwin-x64, linux-arm64 and linux-x64 natively,
+  with a locked dependency install, Bun 1.3.3, and synthetic credentials. Failed
+  builds or smoke tests prevent draft creation. Native release jobs run on fresh
+  hosted VMs and are outside the Docker isolation of REQ-REPO-009.
+- REQ-REPO-012: A separate trusted writer validates all four archives, exact file
+  names, regular file types, bounded sizes, archive contents, checksums, source
+  revision and version before uploading. It installs no project dependencies and
+  never executes a downloaded binary. Drafts contain four archives, SHA256SUMS,
+  and build-info.json. Only artifacts from the same successful workflow run enter
+  this writer.
+- REQ-REPO-013: Automation creates draft releases only. Repeated runs preserve
+  complete releases; interrupted draft uploads reconcile matching assets and fail
+  on conflicts rather than replacing bytes. A published version is never changed.
+  Client PRs include reviewed version/changelog changes when a release is needed;
+  multiple changes may share one release. Maintainers attach every asset before
+  publishing, because repository immutability locks future published releases.
+- REQ-REPO-014: The v0.2.0 release contains the reviewed onboarding commands and
+  refreshed contract. All four exact shipped binaries pass the smoke harness;
+  release metadata identifies their source revision and checksums. Publication
+  of this version is authorized by the user; future publications remain manual.
 
 ## Invariants and non-goals
 
 Workflow jobs never receive Brale credentials or move funds. External contributors
 cannot initiate this repository's CI; workflows run independently in their own
 forks are outside this repository's control. Maintainers inspect outside changes
-before bringing them onto a repository branch for CI. There is no package
-publication or deployment workflow. Repository visibility and licensing do not
+before bringing them onto a repository branch for CI. There is no npm package
+publication or automatic public release workflow. Repository visibility and licensing do not
 change as part of these protections.
 
 The isolation assumes reviewed workflow, runner and publisher definitions. The
@@ -91,8 +122,29 @@ REQ-REPO-009; maintainers review its main-branch inputs before running it.
 - [ ] REQ-REPO-009: The Docker adversarial verifier proves credential/host isolation,
       blocked outbound access, working loopback, skipped lifecycle scripts and
       failure propagation. Compatibility passes inside the same container runner.
+- [x] REQ-REPO-010: Semantic projection and trusted proposal integration tests pass,
+      including annotation-only changes, schema field names, bounds and repeatability.
+- [x] REQ-REPO-012/013: Archive validation and HTTP integration tests pass; existing
+      lightweight and annotated tags must resolve to the build commit; conflicting
+      release assets cause zero replacement writes. Script typechecks run in CI.
+- [x] REQ-REPO-011/013: Workflow policy tests and actionlint verify native runner
+      mappings, main-only execution, successful-build dependencies, stable artifact
+      names across failed-job reruns and draft writer isolation.
+- [ ] REQ-REPO-011/014: All four exact v0.2.0 binaries pass standalone smoke;
+      the source revision, archive digests and published immutability are verified.
 
 ## Decisions
+
+- 2026-09-09, ratified by request: implement spec version/changelog proposals,
+  verified four-platform builds and draft releases; deliver v0.2.0. Future public
+  releases are manual. Repository release immutability and non-updatable,
+  non-deletable v* tags are active. Existing mutable releases remain unchanged.
+- 2026-09-09, provisional: release artifacts use one stable name per platform per
+  workflow run. Rebuilding a leg replaces its workflow artifact; successful legs
+  remain available across failed-job reruns. Each artifact is immutable once
+  uploaded and draft release assets are never overwritten. Conflicts stop for
+  inspection. An existing version tag is independently resolved before and after
+  uploads; an absent tag remains valid for a draft until manual publication.
 
 - 2026-09-08, ratified by request: daily spec checking and automated PR creation
   are authorized; PR approval and merging remain human decisions.
