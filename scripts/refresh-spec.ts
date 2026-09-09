@@ -4,54 +4,24 @@
  * Refreshes exact upstream bytes for review. Pin updates are explicit so manual
  * refreshes retain their review step; automation can prepare a complete PR.
  */
-import { createHash } from 'node:crypto'
-import { mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { readFile } from 'node:fs/promises'
 import { parseArgs } from 'node:util'
 
-const specPath = fileURLToPath(new URL('../packages/brale/openapi/brale.json', import.meta.url))
-const pinPath = fileURLToPath(new URL('../packages/brale/src/spec.ts', import.meta.url))
+import {
+  constantValue,
+  maxDocumentBytes,
+  pinPath,
+  pinnedRevision,
+  sha256,
+  specPath,
+  updatePin,
+  validateDocument,
+  writeProposal,
+  type RefreshResult,
+  type Revision,
+} from './spec-proposal.ts'
+
 const fetchTimeoutMs = 30_000
-const maxResponseBytes = 10 * 1024 * 1024
-
-type Revision = { hash: string; fetchedAt: string }
-type RefreshResult = Revision & { changed: boolean; previousHash: string }
-type PinName = 'SPEC_SHA256' | 'SPEC_FETCHED_AT' | 'SPEC_SOURCE_URL'
-
-function sha256(input: Buffer | string): string {
-  return createHash('sha256').update(input).digest('hex')
-}
-
-function constantPattern(name: PinName): RegExp {
-  return new RegExp(
-    `^(export const ${name}: string =\\s*)(['"])([^'"\\r\\n]+)\\2([ \\t]*;?[ \\t]*)$`,
-    'gm',
-  )
-}
-
-function constantValue(source: string, name: PinName): string | undefined {
-  const declarations = source.match(new RegExp(`^export const ${name}\\b`, 'gm'))
-  const matches = [...source.matchAll(constantPattern(name))]
-  return declarations?.length === 1 && matches.length === 1 ? matches[0]![3] : undefined
-}
-
-function pinnedRevision(source: string): Revision | undefined {
-  const hash = constantValue(source, 'SPEC_SHA256')
-  const fetchedAt = constantValue(source, 'SPEC_FETCHED_AT')
-  if (
-    !hash ||
-    !/^[a-f0-9]{64}$/.test(hash) ||
-    !fetchedAt ||
-    !/^\d{4}-\d{2}-\d{2}$/.test(fetchedAt)
-  ) {
-    return undefined
-  }
-  const date = Date.parse(`${fetchedAt}T00:00:00Z`)
-  if (!Number.isFinite(date) || new Date(date).toISOString().slice(0, 10) !== fetchedAt)
-    return undefined
-  return { hash, fetchedAt }
-}
 
 async function previousRevision(path: string): Promise<Revision | undefined> {
   let source: string
@@ -63,36 +33,6 @@ async function previousRevision(path: string): Promise<Revision | undefined> {
   }
   // The proposal is untrusted source text. Never import or evaluate it.
   return pinnedRevision(source)
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function validateDocument(body: Buffer): void {
-  let document: unknown
-  try {
-    // Keep BOMs visible to JSON.parse and reject invalid UTF-8; neither may be
-    // silently repaired because the hash describes the bytes Brale served.
-    document = JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(body))
-  } catch (error) {
-    throw new Error('Response is not valid UTF-8 JSON', { cause: error })
-  }
-  if (
-    !isObject(document) ||
-    typeof document.openapi !== 'string' ||
-    !/^3\.\d+\.\d+$/.test(document.openapi) ||
-    !isObject(document.info) ||
-    typeof document.info.title !== 'string' ||
-    !document.info.title ||
-    typeof document.info.version !== 'string' ||
-    !document.info.version ||
-    !isObject(document.paths)
-  ) {
-    throw new Error(
-      'Response is not an OpenAPI 3 document with info.title, info.version, and paths',
-    )
-  }
 }
 
 async function fetchDocument(sourceUrl: string): Promise<Buffer> {
@@ -110,7 +50,7 @@ async function fetchDocument(sourceUrl: string): Promise<Buffer> {
     let size = 0
     for await (const chunk of response.body) {
       size += chunk.byteLength
-      if (size > maxResponseBytes) throw new Error('Response exceeds the 10 MiB limit')
+      if (size > maxDocumentBytes) throw new Error('Response exceeds the 10 MiB limit')
       chunks.push(chunk)
     }
     const body = Buffer.concat(chunks, size)
@@ -121,26 +61,6 @@ async function fetchDocument(sourceUrl: string): Promise<Buffer> {
   } finally {
     clearTimeout(timeout)
     controller.abort()
-  }
-}
-
-function updatePin(source: string, revision: Revision): string {
-  return source
-    .replace(constantPattern('SPEC_SHA256'), `$1$2${revision.hash}$2$4`)
-    .replace(constantPattern('SPEC_FETCHED_AT'), `$1$2${revision.fetchedAt}$2$4`)
-}
-
-async function writeProposal(body: Buffer, source: string | undefined): Promise<void> {
-  const staging = await mkdtemp(join(dirname(specPath), '.refresh-spec-'))
-  try {
-    await writeFile(join(staging, 'document'), body)
-    if (source !== undefined) await writeFile(join(staging, 'pin'), source)
-    // Atomicity: each rename is atomic; an interrupted pair fails the hash
-    // precondition on retry. Permanent — Git publishes the pair as one commit.
-    await rename(join(staging, 'document'), specPath)
-    if (source !== undefined) await rename(join(staging, 'pin'), pinPath)
-  } finally {
-    await rm(staging, { recursive: true, force: true })
   }
 }
 

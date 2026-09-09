@@ -14,6 +14,10 @@ verify the changes and repository protections from concrete evidence.
   independent review finds no blocking ambiguity or mandatory private context.
 - Security: repository policy tests and actionlint pass; live Actions and branch
   rules match the requirements in SPEC.md.
+- Isolation: artifact integration tests reject executable/invalid proposals; the
+  Docker verifier demonstrates inaccessible runner credentials and host files,
+  denied outbound test traffic, skipped install scripts and accurate failures.
+  Compatibility cannot mutate the artifact consumed by the publisher.
 - Observability: PR checks report named results; dependency patches and spec
   proposals have a run summary and artifact; spec PRs show compatibility failures;
   unrun checks are labeled as such.
@@ -43,3 +47,9 @@ human approval; the author cannot approve it.
 authorized. The bot has no approval or merge step. Provisional implementation
 decision: use the native token with a separate publisher job; retain maintainer
 control over CI runs and use manual CI dispatch where the actor policy requires it.
+
+2026-09-09, ratified by request: separate preparation, compatibility and publishing;
+validate data and rebuild the pin from trusted source; run CI project checks in
+containers without runner credentials or outbound networking. Workflow changes
+remain subject to maintainer review. Provisional scope: the networked action audit
+and manual dependency patch workflow retain the exceptions documented in SPEC.md.

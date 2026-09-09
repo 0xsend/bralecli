@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 import { hash } from 'node:crypto'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createServer, type ServerResponse } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -51,6 +51,10 @@ async function withFixture(run: (fixture: Fixture) => Promise<void>): Promise<vo
     ])
     await Promise.all([
       writeFile(join(root, 'scripts/refresh-spec.ts'), script),
+      copyFile(
+        new URL('./spec-proposal.ts', import.meta.url),
+        join(root, 'scripts/spec-proposal.ts'),
+      ),
       writeFile(join(root, 'package.json'), '{"type":"module"}'),
       writeFile(specPath, originalBody),
       writeFile(pinPath, pin),

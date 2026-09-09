@@ -22,7 +22,8 @@ type Workflow = {
       'timeout-minutes': number
       permissions?: Record<string, string>
       if?: string
-      needs?: string
+      needs?: string | string[]
+      outputs?: Record<string, string>
       steps: Step[]
     }
   >
@@ -73,6 +74,31 @@ describe('repository automation trust boundaries', () => {
     ])
   })
 
+  it('CI runs all seven required checks through the isolated runner', () => {
+    const jobs = workflow('ci').jobs
+    const commands = {
+      test: 'test',
+      typecheck: 'typecheck',
+      build: 'build',
+      lint: 'lint',
+      format: 'format:check',
+      knip: 'knip',
+      jscpd: 'jscpd',
+    }
+    expect(Object.keys(jobs).toSorted()).toEqual(Object.keys(commands).toSorted())
+    for (const [id, command] of Object.entries(commands)) {
+      const steps = jobs[id]!.steps
+      expect(steps.map((step) => step.run).filter(Boolean)).toEqual(
+        id === 'lint'
+          ? ['node scripts/ci-sandbox.mjs lint', 'node scripts/ci-sandbox.mjs actions:check']
+          : id === 'test'
+            ? ['node --test scripts/ci-sandbox.test.mjs', 'node scripts/ci-sandbox.mjs test']
+            : [`node scripts/ci-sandbox.mjs ${command}`],
+      )
+      expect(steps.some((step) => step.uses === './.github/actions/setup-nub')).toBe(false)
+    }
+  })
+
   it('dependency automation is manual and offers a patch instead of writing to the repository', () => {
     const config = workflow('update-deps')
     expect(Object.keys(config.on)).toEqual(['workflow_dispatch'])
@@ -97,18 +123,41 @@ describe('repository automation trust boundaries', () => {
     }
   })
 
-  it('spec preparation reports failed compatibility checks without suppressing the draft proposal', () => {
+  it('spec preparation freezes data before compatibility executes on a separate runner', () => {
     const config = workflow('update-spec')
     const steps = config.jobs.prepare!.steps
-    const verify = steps.find((step) => step.id === 'verify')
-    expect(verify?.['continue-on-error']).toBe(true)
-    expect(verify?.run).toContain('nub run check')
-    expect(verify?.run).toContain('nub run build')
+    expect(steps.some((step) => step.uses === './.github/actions/setup-nub')).toBe(false)
+    const commands = steps.map((step) => step.run ?? '').join('\n')
+    expect(commands).not.toMatch(/\b(?:npm|nub|npx|bun)\b|spec-update\/spec\.ts/)
+    expect(commands).toContain('node scripts/refresh-spec.ts --update-pin --format json')
+    expect(commands).toContain('"$RUNNER_TEMP/spec-update/revision.json"')
     const upload = steps.find((step) => step.uses?.startsWith('actions/upload-artifact@'))
     expect(upload?.if).toBe("steps.refresh.outputs.changed == 'true'")
     expect(upload?.with?.['if-no-files-found']).toBe('error')
-    expect(config.jobs['pull-request']?.needs).toBe('prepare')
-    expect(config.jobs['pull-request']?.if).toBe("needs.prepare.outputs.changed == 'true'")
+    expect(config.jobs.prepare?.outputs?.['artifact-id']).toBe(
+      '${{ steps.artifact.outputs.artifact-id }}',
+    )
+    const compatibility = config.jobs.compatibility!
+    expect(compatibility?.needs).toBe('prepare')
+    expect(compatibility?.if).toBe("needs.prepare.outputs.changed == 'true'")
+    expect(
+      compatibility?.steps.some((step) => step.run === 'node scripts/ci-sandbox.mjs compatibility'),
+    ).toBe(true)
+    expect(
+      compatibility?.steps.some((step) => step.uses?.startsWith('actions/upload-artifact@')),
+    ).toBe(false)
+    expect(config.jobs['pull-request']?.needs).toEqual(['prepare', 'compatibility'])
+    expect(config.jobs['pull-request']?.if).toBe(
+      "${{ !cancelled() && needs.prepare.result == 'success' && needs.prepare.outputs.changed == 'true' }}",
+    )
+    for (const id of ['compatibility', 'pull-request']) {
+      const download = config.jobs[id]!.steps.find((step) =>
+        step.uses?.startsWith('actions/download-artifact@'),
+      )
+      expect(download?.with?.['artifact-ids']).toBe('${{ needs.prepare.outputs.artifact-id }}')
+      expect(download?.with?.['merge-multiple']).toBe(true)
+      expect(download?.with?.name).toBeUndefined()
+    }
   })
 
   it('only the spec writer can publish and it handles two files without executing the artifact', () => {
@@ -126,18 +175,16 @@ describe('repository automation trust boundaries', () => {
     expect(proposal?.with?.['maintainer-can-modify']).toBe(false)
     expect(job.steps.map((step) => step.uses ?? '').filter(Boolean)).toEqual([
       expect.stringMatching(/^actions\/checkout@/),
+      expect.stringMatching(/^actions\/setup-node@/),
       expect.stringMatching(/^actions\/download-artifact@/),
       expect.stringMatching(/^peter-evans\/create-pull-request@/),
     ])
     const commands = job.steps.map((step) => step.run ?? '').join('\n')
     expect(commands).toContain(
-      'install -m 644 "$RUNNER_TEMP/spec-update/brale.json" packages/brale/openapi/brale.json',
+      'node scripts/apply-spec-proposal.ts --proposal-dir "$RUNNER_TEMP/spec-update"',
     )
-    expect(commands).toContain(
-      'install -m 644 "$RUNNER_TEMP/spec-update/spec.ts" packages/brale/src/spec.ts',
-    )
-    expect(commands).not.toMatch(
-      /\b(?:nub|npm|node|npx|bun|source|eval)\b|gh\s+pr\s+(merge|review)/,
-    )
+    expect(commands).not.toContain('spec-update/spec.ts')
+    expect(commands).not.toMatch(/\b(?:nub|npm|npx|bun|source|eval)\b|gh\s+pr\s+(merge|review)/)
+    expect(proposal?.with?.body).toContain('${{ needs.compatibility.result }}')
   })
 })
