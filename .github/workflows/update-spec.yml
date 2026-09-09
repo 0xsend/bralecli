@@ -155,10 +155,13 @@ jobs:
             validates the preparation artifact and reconstructs the pin from trusted
             source; compatibility code cannot replace the proposed files.
 
-            Review the contract diff and resolve any failed checks before marking
-            this ready. Approve pending PR workflows if offered, or manually run
-            **CI** on `automation/brale-spec` as a maintainer. Required review and
-            branch protections still apply; this bot never approves or merges.
+            Review the contract diff, then close and reopen this draft PR as a
+            maintainer to trigger pull-request CI under this repository's actor
+            policy. Confirm all seven required checks appear on the current PR
+            revision and pass before marking it ready, requesting approval, or
+            merging. Manual **CI** dispatch remains useful for diagnostics;
+            verify the required checks attached to this PR itself. Required human
+            review and branch protections still apply; this bot never approves or merges.
 
             This branch belongs to the bot and may be replaced on the next run.
             Make compatibility fixes on a separate branch.

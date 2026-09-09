@@ -18,9 +18,9 @@ verify the changes and repository protections from concrete evidence.
   Docker verifier demonstrates inaccessible runner credentials and host files,
   denied outbound test traffic, skipped install scripts and accurate failures.
   Compatibility cannot mutate the artifact consumed by the publisher.
-- Observability: PR checks report named results; dependency patches and spec
-  proposals have a run summary and artifact; spec PRs show compatibility failures;
-  unrun checks are labeled as such.
+- Observability: all seven required checks appear on the current PR revision and
+  report named results; dependency patches and spec proposals have a run summary
+  and artifact; spec PRs show compatibility failures; unrun checks are labeled as such.
 - Idempotency: refresh tests prove unchanged bytes preserve the document and date,
   including repeated proposals; one fixed bot branch prevents daily duplicate PRs.
 
@@ -46,10 +46,15 @@ human approval; the author cannot approve it.
 2026-09-08, ratified by request: daily spec checking and bot PR creation are
 authorized. The bot has no approval or merge step. Provisional implementation
 decision: use the native token with a separate publisher job; retain maintainer
-control over CI runs and use manual CI dispatch where the actor policy requires it.
+control over CI runs.
 
 2026-09-09, ratified by request: separate preparation, compatibility and publishing;
 validate data and rebuild the pin from trusted source; run CI project checks in
 containers without runner credentials or outbound networking. Workflow changes
 remain subject to maintainer review. Provisional scope: the networked action audit
 and manual dependency patch workflow retain the exceptions documented in SPEC.md.
+
+2026-09-09, provisional: after reviewing bot changes, a maintainer closes and
+reopens the draft PR to trigger pull-request CI. Manual dispatch is diagnostic;
+acceptance requires all seven checks attached to the current PR revision.
+Evidence: [repository verification](SPEC.md#decisions).
