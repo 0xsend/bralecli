@@ -3,6 +3,8 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
+import { compileBinaries } from './compile-binaries.mjs'
+
 if (Bun.version !== '1.3.3') throw new Error('This release recipe requires Bun 1.3.3')
 const root = process.cwd()
 const out = process.argv[2]
@@ -77,30 +79,7 @@ const result = await Bun.build({
   ],
 })
 if (!result.success) throw new AggregateError(result.logs, 'Bundle failed')
-await Promise.all(
-  platforms.map(async (platform) => {
-    const filename = `bralecli-${platform.replace('-baseline', '')}`
-    const child = Bun.spawn(
-      [
-        'bun',
-        'build',
-        intermediate,
-        '--compile',
-        `--target=bun-${platform}`,
-        '--no-compile-autoload-dotenv',
-        '--no-compile-autoload-bunfig',
-        '--env=disable',
-        '--outfile',
-        resolve(out, filename),
-      ],
-      { stdout: 'inherit', stderr: 'inherit' },
-    )
-    const timeout = setTimeout(() => child.kill(), 300_000)
-    const code = await child.exited
-    clearTimeout(timeout)
-    if (code !== 0) throw new Error(`Compile failed: ${platform}`)
-  }),
-)
+await compileBinaries({ compiler: process.execPath, intermediate, targets: platforms, out })
 await writeFile(
   resolve(out, 'build-info.json'),
   JSON.stringify({ revision, version, bun: Bun.version }, null, 2) + '\n',
