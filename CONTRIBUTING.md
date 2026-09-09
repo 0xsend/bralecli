@@ -88,12 +88,17 @@ To activate the workflow after merging it to `main`:
    unchanged upstream document needs no PR. A changed document produces a draft
    with the upstream hash and compatibility outcome.
 
-The native `GITHUB_TOKEN` needs no additional secret. Bot-created PR workflow
-runs may need approval, and the repository's actor policy can restrict them.
-Approve pending runs if GitHub offers that option; otherwise manually dispatch
-**CI** on `automation/brale-spec` as a maintainer. Confirm all required checks
-pass on the current PR revision before merging. Independent human review and
-branch protections still apply.
+The native `GITHUB_TOKEN` needs no additional secret. This repository's actor
+policy blocks CI triggered by the bot. After reviewing the bot's changes, close
+and reopen the draft PR as a maintainer to trigger pull-request CI. Confirm all
+seven required checks appear on the current PR revision and pass before marking
+it ready, requesting approval, or merging. Independent human review and branch
+protections still apply.
+
+Manual **CI** dispatch on `automation/brale-spec` remains useful for diagnostics.
+In this repository's [live verification](.github/SPEC.md#decisions), a manual run
+passed on the same commit while the PR's required checks remained missing.
+Verify the checks attached to the PR itself.
 
 The bot replaces its dedicated branch on later upstream changes. Make fixes on
 a separate branch, and close an obsolete proposal if upstream reverts to the

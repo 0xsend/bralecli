@@ -76,13 +76,16 @@ REQ-REPO-009; maintainers review its main-branch inputs before running it.
 - [ ] REQ-REPO-002: Active Actions policy shows the two roles and four events.
 - [ ] REQ-REPO-003/005: `nub run test` includes the repository policy tests; actionlint passes.
 - [ ] REQ-REPO-004: Live ruleset matches `.github/rules/main.json` with no bypass actors.
-- [ ] REQ-REPO-003/004: GitHub CI passes on the proposed commit; token defaults are read-only.
+- [ ] REQ-REPO-003/004: All seven required CI checks appear on the current PR
+      revision and pass; token defaults are read-only.
 - [ ] REQ-REPO-006/007: Refresh integration tests cover changed/unchanged bytes,
       repeated proposals, invalid responses, and pin integrity; workflow policy tests
       verify trigger, branch, artifact, and permission boundaries.
-- [ ] REQ-REPO-006/007: A manual Actions run verifies the published workflow;
-      native-token PR creation is enabled in repository settings. Maintainers approve
-      bot-triggered PR workflow runs or dispatch CI on the bot branch before merging.
+- [ ] REQ-REPO-004/006/007: A manual Actions run verifies the published workflow;
+      native-token PR creation is enabled in repository settings. After reviewing
+      the bot's changes, a maintainer closes and reopens the draft PR. Pull-request
+      CI starts and all seven required checks appear on the current PR revision
+      and pass before the PR is marked ready, submitted for approval, or merged.
 - [ ] REQ-REPO-008: Artifact integration tests reject hostile files/metadata without
       changing trusted files; workflow tests prove separate jobs and artifact IDs.
 - [ ] REQ-REPO-009: The Docker adversarial verifier proves credential/host isolation,
@@ -102,6 +105,15 @@ REQ-REPO-009; maintainers review its main-branch inputs before running it.
 - 2026-09-09, provisional: the action-manifest audit retains credential-free
   network access because it reads remote action definitions; the manual dependency
   patch workflow is a separate maintainer-operated surface.
+- 2026-09-09, provisional: maintainers review bot changes, then close and reopen
+  the draft PR to trigger pull-request CI. Manual dispatch remains diagnostic.
+  In this repository's [PR #8](https://github.com/0xsend/bralecli/pull/8) verification,
+  the [bot-triggered run](https://github.com/0xsend/bralecli/actions/runs/34307044158)
+  was rejected by actor policy. A [maintainer dispatch](https://github.com/0xsend/bralecli/actions/runs/34307113519)
+  passed all seven jobs on the same commit while required PR checks remained missing.
+  The [maintainer reopen run](https://github.com/0xsend/bralecli/actions/runs/34307376855)
+  attached all seven required checks to that PR revision, and all passed. Acceptance therefore
+  requires the PR's own checks, not success on a separate run.
 
 Risk: authorization and CI configuration. Applying repository rules is an
 administrator operation; changes are reviewed before activation.
