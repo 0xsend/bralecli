@@ -280,6 +280,23 @@ operation has a unique `operationId`, every path parameter lives on the
 operation — so a refresh that breaks one fails loudly rather than silently
 renaming or de-arming commands.
 
+The **Update Brale Spec** workflow checks this endpoint daily at 08:23 UTC and
+can also be run manually on `main`. It compares raw bytes, including changes
+that leave `info.version` unchanged. A changed document opens or updates one
+draft PR on `automation/brale-spec`, including its checksum and fetch date.
+The same upstream revision keeps its original proposal date. Package versions
+are not bumped automatically.
+
+The workflow uses `nub scripts/refresh-spec.ts --update-pin --format json` to
+prepare the proposal. `--previous-pin <path>` reads an earlier proposal's pin
+as text to preserve the date when its hash matches. The normal manual refresh
+continues to leave pin updates for the maintainer. Invalid downloads fail before
+writing the spec; compatibility failures are reported in the draft PR and run
+logs. The bot owns its branch, so make follow-up fixes on a separate branch.
+
+Activation and the maintainer CI handoff are described in
+[CONTRIBUTING.md](CONTRIBUTING.md#daily-spec-updates).
+
 ## Development
 
 ```sh

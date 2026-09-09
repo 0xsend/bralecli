@@ -8,8 +8,8 @@
  * upstream can change the contract with no bump and no signal.
  *
  * The document is therefore committed rather than fetched. A vendored copy
- * makes the contract a reviewable artifact: `spec:refresh` re-downloads it and
- * the diff shows exactly what Brale changed, which is the only notice we get.
+ * makes the contract a reviewable artifact: manual refreshes and the daily
+ * spec-update PR show exactly what Brale changed, which is the only notice we get.
  * Fetching at startup would trade that for a CLI whose command surface
  * silently changes shape between two runs.
  */

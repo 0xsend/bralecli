@@ -1,0 +1,147 @@
+name: Update Brale Spec
+
+on:
+  schedule:
+    - cron: '23 8 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brale-spec-update
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Check upstream spec
+    if: github.repository == '0xsend/bralecli' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      changed: ${{ steps.refresh.outputs.changed }}
+      hash: ${{ steps.refresh.outputs.hash }}
+      verification: ${{ steps.verify.outcome }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-nub
+      - run: nub ci
+
+      - name: Read previous proposal pin
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          previous_sha=$(timeout 30s gh api \
+            "repos/$GITHUB_REPOSITORY/git/matching-refs/heads/automation/brale-spec" \
+            --jq '.[] | select(.ref == "refs/heads/automation/brale-spec") | .object.sha')
+          if [ -n "$previous_sha" ]; then
+            timeout 30s gh api -H 'Accept: application/vnd.github.raw+json' \
+              "repos/$GITHUB_REPOSITORY/contents/packages/brale/src/spec.ts?ref=$previous_sha" \
+              > "$RUNNER_TEMP/previous-pin.ts"
+          fi
+
+      - name: Refresh spec and pin
+        id: refresh
+        shell: bash
+        run: |
+          set -euo pipefail
+          nub scripts/refresh-spec.ts --update-pin --format json \
+            --previous-pin "$RUNNER_TEMP/previous-pin.ts" > "$RUNNER_TEMP/spec-refresh.json"
+          changed=$(jq -er '.changed | tostring' "$RUNNER_TEMP/spec-refresh.json")
+          hash=$(jq -er '.hash' "$RUNNER_TEMP/spec-refresh.json")
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          echo "hash=$hash" >> "$GITHUB_OUTPUT"
+          echo "Spec changed: $changed; upstream SHA-256: $hash" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$changed" = true ]; then
+            mkdir -p "$RUNNER_TEMP/spec-update"
+            cp packages/brale/openapi/brale.json "$RUNNER_TEMP/spec-update/brale.json"
+            cp packages/brale/src/spec.ts "$RUNNER_TEMP/spec-update/spec.ts"
+          fi
+
+      - name: Check compatibility
+        id: verify
+        if: steps.refresh.outputs.changed == 'true'
+        continue-on-error: true
+        run: |
+          nub run check
+          nub run build
+          nub run knip
+          nub run jscpd
+
+      - name: Report compatibility
+        if: steps.refresh.outputs.changed == 'true'
+        env:
+          VERIFICATION: ${{ steps.verify.outcome }}
+        run: echo "Compatibility checks $VERIFICATION. Failed checks require maintainer fixes; the changed spec still receives a draft PR." >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: steps.refresh.outputs.changed == 'true'
+        with:
+          name: brale-spec-update
+          path: ${{ runner.temp }}/spec-update/
+          if-no-files-found: error
+          retention-days: 7
+
+  pull-request:
+    name: Propose spec update
+    needs: prepare
+    if: needs.prepare.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: brale-spec-update
+          path: ${{ runner.temp }}/spec-update
+      - name: Copy the proposed contract
+        run: |
+          install -m 644 "$RUNNER_TEMP/spec-update/brale.json" packages/brale/openapi/brale.json
+          install -m 644 "$RUNNER_TEMP/spec-update/spec.ts" packages/brale/src/spec.ts
+      - name: Create or update draft PR
+        id: proposal
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
+        with:
+          base: main
+          branch: automation/brale-spec
+          add-paths: |
+            packages/brale/openapi/brale.json
+            packages/brale/src/spec.ts
+          commit-message: 'chore(spec): refresh Brale OpenAPI contract'
+          title: 'chore(spec): refresh Brale OpenAPI contract'
+          draft: always-true
+          maintainer-can-modify: false
+          body: |
+            Brale's upstream OpenAPI bytes changed. This PR updates the vendored
+            document and its SHA-256/fetch-date pin; package versions are unchanged.
+
+            Upstream SHA-256: `${{ needs.prepare.outputs.hash }}`
+
+            Compatibility check sequence: **${{ needs.prepare.outputs.verification }}**.
+            The sequence runs `nub run check`, `nub run build`, `nub run knip`, and
+            `nub run jscpd`, stopping at the first failure. Later checks after a
+            failure are NOT RUN. Inspect the [run logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for results.
+
+            Review the contract diff and resolve any failed checks before marking
+            this ready. Approve pending PR workflows if offered, or manually run
+            **CI** on `automation/brale-spec` as a maintainer. Required review and
+            branch protections still apply; this bot never approves or merges.
+
+            This branch belongs to the bot and may be replaced on the next run.
+            Make compatibility fixes on a separate branch.
+      - name: Report proposal
+        env:
+          PR_URL: ${{ steps.proposal.outputs.pull-request-url }}
+          OPERATION: ${{ steps.proposal.outputs.pull-request-operation }}
+        run: echo "Spec PR $OPERATION $PR_URL" >> "$GITHUB_STEP_SUMMARY"

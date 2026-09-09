@@ -11,18 +11,33 @@ updating the default branch.
   acceptance criteria. The PR template asks for actual validation and optional
   handoff notes without requiring private agent transcripts.
 - REQ-REPO-002: Repository workflow execution is restricted to the Maintain and
-  Admin roles and the push, pull_request, and workflow_dispatch events through an
+  Admin roles and the push, pull_request, workflow_dispatch, and schedule events through an
   active GitHub Actions policy. GitHub's built-in feature exemptions remain a
   platform limitation, not an authorization granted by this repository.
-- REQ-REPO-003: Workflows use read-only contents permissions, hosted runners,
+- REQ-REPO-003: Workflows default to read-only contents permissions, hosted runners,
   bounded timeouts, commit-pinned actions, and checkout without persisted credentials.
-  Fork workflows receive no write tokens or secrets.
+  Fork workflows receive no write tokens or secrets. Only the spec PR job receives
+  contents and pull-requests write permissions; it does not install dependencies
+  or execute repository scripts or the refreshed spec.
 - REQ-REPO-004: The default branch requires a PR, one code-owner approval from
   someone other than the latest pusher, dismissal of stale approvals, resolved
   review threads, and all seven CI checks on up-to-date code. No bypass actors,
   force pushes, or branch deletion are allowed.
 - REQ-REPO-005: Dependency updates are manually requested on main and produce a
-  downloadable patch. Automation does not push commits, create PRs, or approve PRs.
+  downloadable patch. Dependency automation does not push commits or create PRs.
+  No automation approves or merges PRs.
+- REQ-REPO-006: The spec updater runs daily at 08:23 UTC, or manually on main,
+  in the canonical repository only. A bounded fetch compares the upstream raw
+  bytes, preserving them exactly. Unchanged bytes produce no file/date changes;
+  changed bytes update the vendored document, SHA-256, and fetch date. An explicit
+  `--update-pin` option enables pin updates; the default refresh leaves pins for
+  manual review. Invalid responses fail before writing files.
+- REQ-REPO-007: One dedicated branch, `automation/brale-spec`, holds the latest
+  spec proposal. A repeated upstream revision preserves its prior fetch date.
+  Only the vendored document and pin file enter its PR. The updater reports
+  compatibility checks and opens a draft even when those checks fail, so upstream
+  changes remain visible. Fetch/preparation failures do not publish a proposal.
+  Package versions and releases are separate maintainer decisions.
 
 ## Invariants and non-goals
 
@@ -36,10 +51,24 @@ change as part of these protections.
 ## Acceptance and traceability
 
 - [ ] REQ-REPO-001: YAML parsing and independent template review pass.
-- [ ] REQ-REPO-002: Active Actions policy shows exactly the two roles and three events.
+- [ ] REQ-REPO-002: Active Actions policy shows the two roles and four events.
 - [ ] REQ-REPO-003/005: `nub run test` includes the repository policy tests; actionlint passes.
 - [ ] REQ-REPO-004: Live ruleset matches `.github/rules/main.json` with no bypass actors.
 - [ ] REQ-REPO-003/004: GitHub CI passes on the proposed commit; token defaults are read-only.
+- [ ] REQ-REPO-006/007: Refresh integration tests cover changed/unchanged bytes,
+      repeated proposals, invalid responses, and pin integrity; workflow policy tests
+      verify trigger, branch, artifact, and permission boundaries.
+- [ ] REQ-REPO-006/007: A manual Actions run verifies the published workflow;
+      native-token PR creation is enabled in repository settings. Maintainers approve
+      bot-triggered PR workflow runs or dispatch CI on the bot branch before merging.
+
+## Decisions
+
+- 2026-09-08, ratified by request: daily spec checking and automated PR creation
+  are authorized; PR approval and merging remain human decisions.
+- 2026-09-08, provisional: native `GITHUB_TOKEN` avoids a new long-lived secret;
+  preparation runs separately from the writer. Spec revision means raw bytes and
+  their pin, because the upstream version string does not reliably change.
 
 Risk: authorization and CI configuration. Applying repository rules is an
 administrator operation; changes are reviewed before activation.

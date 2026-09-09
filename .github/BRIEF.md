@@ -14,8 +14,11 @@ verify the changes and repository protections from concrete evidence.
   independent review finds no blocking ambiguity or mandatory private context.
 - Security: repository policy tests and actionlint pass; live Actions and branch
   rules match the requirements in SPEC.md.
-- Observability: PR checks report named results; dependency patches have a run
-  summary and artifact; unrun checks are labeled as such.
+- Observability: PR checks report named results; dependency patches and spec
+  proposals have a run summary and artifact; spec PRs show compatibility failures;
+  unrun checks are labeled as such.
+- Idempotency: refresh tests prove unchanged bytes preserve the document and date,
+  including repeated proposals; one fixed bot branch prevents daily duplicate PRs.
 
 ## Oracle
 
@@ -35,3 +38,8 @@ policy uses the existing Maintain/Admin roles; repository visibility stays priva
 Activating authorization and branch rules requires the plan approval specified in
 the operator's AGENTS.md. Merging a protected PR still requires an independent
 human approval; the author cannot approve it.
+
+2026-09-08, ratified by request: daily spec checking and bot PR creation are
+authorized. The bot has no approval or merge step. Provisional implementation
+decision: use the native token with a separate publisher job; retain maintainer
+control over CI runs and use manual CI dispatch where the actor policy requires it.

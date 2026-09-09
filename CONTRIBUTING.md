@@ -44,3 +44,38 @@ review process as any other contribution.
 Maintainers can manually run **Update Dependencies** on `main` to obtain a patch
 artifact. Review it, apply it on a branch with `git apply dependency-update.patch`,
 and open a PR. The workflow does not push or merge dependency changes.
+
+## Daily spec updates
+
+**Update Brale Spec** checks upstream daily at 08:23 UTC (GitHub schedules may
+be delayed) and supports manual runs on `main`. Its read-only job downloads the
+spec, updates its pin, and runs compatibility checks. A separate job opens or
+updates the draft PR on `automation/brale-spec`. Failed compatibility checks
+remain visible in the PR; they do not suppress the proposal. The publishing
+job copies only the spec and pin, without installing or running project code.
+
+To activate the workflow after merging it to `main`:
+
+1. In [Actions policies](https://github.com/0xsend/bralecli/settings/actions/rules/4145),
+   add `schedule` to **Maintainer-controlled workflows**. Retain Maintain/Admin
+   actors and the existing events. A maintainer must install or update the cron
+   so the scheduled actor is permitted.
+2. In [Actions settings](https://github.com/0xsend/bralecli/settings/actions),
+   enable **Allow GitHub Actions to create and approve pull requests**. GitHub
+   combines creation and approval in this setting; the bot never approves PRs.
+   Keep default token permissions read-only. Only the publishing job requests
+   contents and pull-request write access.
+3. Manually run **Update Brale Spec** on `main` and inspect its summary. An
+   unchanged upstream document needs no PR. A changed document produces a draft
+   with the upstream hash and compatibility outcome.
+
+The native `GITHUB_TOKEN` needs no additional secret. Bot-created PR workflow
+runs may need approval, and the repository's actor policy can restrict them.
+Approve pending runs if GitHub offers that option; otherwise manually dispatch
+**CI** on `automation/brale-spec` as a maintainer. Confirm all required checks
+pass on the current PR revision before merging. Independent human review and
+branch protections still apply.
+
+The bot replaces its dedicated branch on later upstream changes. Make fixes on
+a separate branch, and close an obsolete proposal if upstream reverts to the
+vendored revision. The updater does not bump package versions or publish a release.
