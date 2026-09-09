@@ -5,6 +5,7 @@ from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
 binary = str(Path(sys.argv[1]).resolve())
+expected_skill = Path(__file__).resolve().parents[1].joinpath('.agents/skills/bralecli/SKILL.md').read_text()
 requests = []
 class Mock(BaseHTTPRequestHandler):
     def log_message(self, *args): pass
@@ -20,7 +21,9 @@ class Mock(BaseHTTPRequestHandler):
         self.send_response(200); self.send_header('Content-Type','application/json'); self.send_header('Content-Length',str(len(body))); self.end_headers(); self.wfile.write(body)
 
 with tempfile.TemporaryDirectory(prefix='bralecli-smoke-') as cwd:
-    env={'PATH':'/nonexistent','HOME':cwd,'NO_COLOR':'1'}
+    agent_home = Path(cwd,'home')
+    agent_home.mkdir()
+    env={'PATH':'/nonexistent','HOME':str(agent_home),'NO_COLOR':'1'}
     def run(*args, extra=None, success=True):
         result=subprocess.run([binary,*args],cwd=cwd,env={**env,**(extra or {})},text=True,capture_output=True,timeout=20)
         if success: assert result.returncode == 0, (args,result.returncode,result.stdout,result.stderr)
@@ -33,6 +36,31 @@ with tempfile.TemporaryDirectory(prefix='bralecli-smoke-') as cwd:
     assert 'page_size' in run('list_accounts','--schema')
     for command in ['completions','mcp','skills']:
         assert f'Usage: bralecli {command}' in run(command,'--help')
+    assert 'Usage: bralecli agents install' in run('agents','install','--help')
+    # Source files are unavailable to the executable; only its embedded skill
+    # can supply these bytes. HOME, PATH and credentials are isolated above.
+    instructions = {'AGENTS.md':'Existing project instructions\n','CLAUDE.md':'Existing Claude instructions\n'}
+    for filename, content in instructions.items():
+        Path(cwd,filename).write_text(content)
+    installed = json.loads(run('agents','install','--format','json'))
+    assert installed, 'Installer returned no result'
+    for directory in ['.agents','.claude']:
+        assert Path(cwd,directory,'skills','bralecli','SKILL.md').read_text() == expected_skill
+    for filename, content in instructions.items():
+        assert Path(cwd,filename).read_text() == content
+    first_mtimes = [Path(cwd,d,'skills','bralecli','SKILL.md').stat().st_mtime_ns for d in ['.agents','.claude']]
+    run('agents','install','--format','json')
+    assert first_mtimes == [Path(cwd,d,'skills','bralecli','SKILL.md').stat().st_mtime_ns for d in ['.agents','.claude']]
+    custom_claude = str(Path(cwd,'claude-config'))
+    run('agents','install','--global','--format','json',extra={'CLAUDE_CONFIG_DIR':custom_claude})
+    assert agent_home.joinpath('.agents','skills','bralecli','SKILL.md').read_text() == expected_skill
+    assert Path(custom_claude,'skills','bralecli','SKILL.md').read_text() == expected_skill
+    conflict = Path(cwd,'.claude','skills','bralecli','SKILL.md')
+    conflict.write_text('Customized skill\n')
+    assert '--force' in run('agents','install','--format','json',success=False)
+    assert conflict.read_text() == 'Customized skill\n'
+    run('agents','install','--force','--format','json')
+    assert conflict.read_text() == expected_skill
     assert 'bralecli' in run('completions','bash')
     # If automatic .env loading regresses, this produces an invalid-whitespace
     # credential error rather than the expected missing-credentials error.
@@ -85,4 +113,4 @@ with tempfile.TemporaryDirectory(prefix='bralecli-smoke-') as cwd:
     finally:
         selector.close(); process.terminate(); process.wait(timeout=5)
 
-print(Path(binary).name+': PASS (standalone, env isolation, help/schema, integrations, mock OAuth/list/transfer, input safety, MCP tool discovery)')
+print(Path(binary).name+': PASS (standalone, env isolation, help/schema, curated agent installs, integrations, mock OAuth/list/transfer, input safety, MCP tool discovery)')

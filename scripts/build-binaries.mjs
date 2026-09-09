@@ -23,7 +23,12 @@ const result = await Bun.build({
   target: 'bun',
   conditions: ['@bralecli/source'],
   env: 'disable',
-  define: { __INCUR_BINARY_VERSION__: JSON.stringify(version) },
+  define: {
+    __INCUR_BINARY_VERSION__: JSON.stringify(version),
+    __BRALE_AGENT_SKILL__: JSON.stringify(
+      await readFile(resolve(root, '.agents/skills/bralecli/SKILL.md'), 'utf8'),
+    ),
+  },
   plugins: [
     {
       name: 'embed-vendored-brale-spec',
