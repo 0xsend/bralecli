@@ -284,8 +284,9 @@ The **Update Brale Spec** workflow checks this endpoint daily at 08:23 UTC and
 can also be run manually on `main`. It compares raw bytes, including changes
 that leave `info.version` unchanged. A changed document opens or updates one
 draft PR on `automation/brale-spec`, including its checksum and fetch date.
-The same upstream revision keeps its original proposal date. Package versions
-are not bumped automatically.
+The same upstream revision keeps its original proposal date. Contract changes
+also propose a CLI version and changelog update for maintainer review;
+documentation-only changes do not propose a new release.
 
 The workflow uses `nub scripts/refresh-spec.ts --update-pin --format json` to
 prepare the proposal. `--previous-pin <path>` reads an earlier proposal's pin
@@ -294,7 +295,13 @@ continues to leave pin updates for the maintainer. Invalid downloads fail before
 writing the spec; compatibility failures are reported in the draft PR and run
 logs. The bot owns its branch, so make follow-up fixes on a separate branch.
 
-Activation and the maintainer CI handoff are described in
+After a reviewed version update reaches `main`, **Prepare Release** builds and
+smoke-tests all four standalone executables and prepares a draft release.
+Maintainers review and publish the completed draft; publication locks its assets
+under repository release immutability. Installed executables retain their embedded
+contract until users install a new release.
+
+Activation, the maintainer CI handoff and release operation are described in
 [CONTRIBUTING.md](CONTRIBUTING.md#daily-spec-updates).
 
 ## Development

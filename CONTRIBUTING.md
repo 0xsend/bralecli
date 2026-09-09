@@ -71,6 +71,11 @@ metadata. A separate job checks compatibility in the CI container. The publisher
 validates the immutable preparation artifact and reconstructs the pin from its
 trusted main checkout, then opens or updates the draft PR on
 `automation/brale-spec`. It never accepts executable source from the artifact.
+When the contract changes, the trusted publisher also proposes a CLI version and
+changelog entry. Formatting and known documentation annotations alone do not
+trigger a release. Because an upstream contract change may be breaking, automatic
+proposals increment the minor version before 1.0 and the major version thereafter.
+Reviewers assess compatibility and can adjust the proposed bump before merging.
 Failed compatibility checks remain visible in the PR and do not suppress it.
 
 To activate the workflow after merging it to `main`:
@@ -102,4 +107,45 @@ Verify the checks attached to the PR itself.
 
 The bot replaces its dedicated branch on later upstream changes. Make fixes on
 a separate branch, and close an obsolete proposal if upstream reverts to the
-vendored revision. The updater does not bump package versions or publish a release.
+vendored revision. Its version and changelog changes remain proposals until merged.
+
+## Releases
+
+Include a CLI version bump in `apps/cli/package.json` and an entry in
+`apps/cli/CHANGELOG.md` when a client change needs to ship. Multiple changes may
+share a version. Spec PRs propose these files automatically. Repository-only
+changes do not require a release.
+
+**Prepare Release** runs on maintainer pushes to `main`, including reviewed PR
+merges, and supports manual dispatch on `main`. An already completed version is a
+no-op. A pending version runs locked installs and project checks, then builds and
+smoke-tests each executable on its native macOS/Linux and ARM64/x64 runner. These
+jobs are read-only, skip install scripts, and use synthetic credentials; they run
+on fresh hosted VMs rather than the CI Docker sandbox.
+
+A separate writer downloads artifacts from that successful run, validates the
+archive contents, source revision, version and checksums, then creates a draft
+containing four archives, `SHA256SUMS` and `build-info.json`. It never executes
+downloaded binaries or installs dependencies. Failed uploads leave a draft;
+reruns resume matching assets and reject conflicts without replacing bytes.
+
+Review the draft's source revision, changelog and all four build/smoke results.
+Confirm all six assets are attached before publishing. Repository release
+immutability locks the assets and tag when the draft is published. Corrections
+ship under a new version. Automation never publishes a draft or approves/merges
+a PR. Existing mutable releases are not changed by this workflow.
+
+For local recovery, use a clean checkout of the exact intended source commit:
+
+```sh
+nub ci --ignore-scripts
+bun --no-env-file scripts/build-binaries.mjs /absolute/binaries
+# Run scripts/smoke-binary.py against each target on a compatible machine.
+nub scripts/release-artifacts.ts package /absolute/binaries darwin-arm64 /absolute/package-darwin-arm64
+# Repeat packaging for the other three platforms; collect their files in inputs.
+gh auth token | nub scripts/release-draft.ts upload /absolute/inputs /absolute/new-verified-output
+```
+
+Packaging does not replace the required smoke tests. The upload command validates
+the inputs and leaves the release as a draft. Pass tokens only through stdin;
+never place them in command arguments or files.

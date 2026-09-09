@@ -22,29 +22,37 @@ const proposal = {
 const proposedSource = baseSource
   .replace(proposal.previousHash, proposal.hash)
   .replace(/(SPEC_FETCHED_AT: string = ')[^']+/, '$12026-09-02')
+const packageSource = '{"name":"bralecli","version":"0.2.7","private":true}\n'
+const changelogSource = '# bralecli\n\n## 0.2.7\n\n- Existing release.\n'
 
 let root: string
 let proposalDirectory: string
 let documentPath: string
 let sourcePath: string
+let packagePath: string
+let changelogPath: string
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'brale-spec-apply-'))
   proposalDirectory = join(root, 'proposal')
   documentPath = join(root, 'packages/brale/openapi/brale.json')
   sourcePath = join(root, 'packages/brale/src/spec.ts')
+  packagePath = join(root, 'apps/cli/package.json')
+  changelogPath = join(root, 'apps/cli/CHANGELOG.md')
   await Promise.all(
-    ['scripts', 'packages/brale/openapi', 'packages/brale/src', 'proposal'].map((path) =>
-      mkdir(join(root, path), { recursive: true }),
+    ['scripts', 'packages/brale/openapi', 'packages/brale/src', 'apps/cli', 'proposal'].map(
+      (path) => mkdir(join(root, path), { recursive: true }),
     ),
   )
   await Promise.all([
-    ...['apply-spec-proposal.ts', 'spec-proposal.ts'].map((name) =>
+    ...['apply-spec-proposal.ts', 'spec-proposal.ts', 'spec-release.ts'].map((name) =>
       copyFile(new URL(`./${name}`, import.meta.url), join(root, 'scripts', name)),
     ),
     writeFile(join(root, 'package.json'), '{"type":"module"}'),
     writeFile(documentPath, baseDocument),
     writeFile(sourcePath, baseSource),
+    writeFile(packagePath, packageSource),
+    writeFile(changelogPath, changelogSource),
     writeFile(join(proposalDirectory, 'brale.json'), proposedDocument),
     writeFile(join(proposalDirectory, 'revision.json'), JSON.stringify(proposal)),
   ])
@@ -63,12 +71,25 @@ function apply(directory = proposalDirectory): Promise<{ stdout: string; stderr:
 }
 
 async function rejectsUnchanged(message: string): Promise<void> {
-  const before = await Promise.all([readFile(documentPath), readFile(sourcePath)])
+  const paths = [documentPath, sourcePath, packagePath, changelogPath]
+  const before = await Promise.all(paths.map((path) => readFile(path)))
   await expect(apply()).rejects.toMatchObject({
     stdout: '',
     stderr: expect.stringContaining(message),
   })
-  expect(await Promise.all([readFile(documentPath), readFile(sourcePath)])).toEqual(before)
+  expect(await Promise.all(paths.map((path) => readFile(path)))).toEqual(before)
+}
+
+async function proposeContractChange(): Promise<Buffer> {
+  const document = JSON.parse(baseDocument.toString('utf8'))
+  delete document.paths['/accounts/{account_id}/financial-institutions/{fi_id}/status']
+  const body = Buffer.from(`${JSON.stringify(document, null, 4)}\n\n`)
+  await writeFile(join(proposalDirectory, 'brale.json'), body)
+  await writeFile(
+    join(proposalDirectory, 'revision.json'),
+    JSON.stringify({ ...proposal, hash: hash('sha256', body) }),
+  )
+  return body
 }
 
 describe('trusted application of data-only spec proposals', () => {
@@ -76,10 +97,47 @@ describe('trusted application of data-only spec proposals', () => {
     const sentinel = '\nthrow new Error("Pin source must never execute")\n'
     await writeFile(sourcePath, baseSource + sentinel)
     const result = await apply()
-    expect(JSON.parse(result.stdout)).toEqual(proposal)
+    expect(JSON.parse(result.stdout)).toEqual({ ...proposal, release: { kind: 'none' } })
     expect(await readFile(documentPath)).toEqual(proposedDocument)
     expect(await readFile(sourcePath, 'utf8')).toBe(proposedSource + sentinel)
+    expect(await readFile(packagePath, 'utf8')).toBe(packageSource)
+    expect(await readFile(changelogPath, 'utf8')).toBe(changelogSource)
     await rejectsUnchanged('previousHash')
+  })
+
+  it('proposes a reviewed release for a semantic contract change and preserves the exact spec bytes', async () => {
+    const body = await proposeContractChange()
+    const result = await apply()
+    expect(JSON.parse(result.stdout).release).toEqual({
+      kind: 'release',
+      previousVersion: '0.2.7',
+      version: '0.3.0',
+    })
+    expect(JSON.parse(await readFile(packagePath, 'utf8')).version).toBe('0.3.0')
+    expect(await readFile(changelogPath, 'utf8')).toContain('## 0.3.0\n')
+    expect(await readFile(changelogPath, 'utf8')).toContain(hash('sha256', body))
+    expect(await readFile(documentPath)).toEqual(body)
+    await rejectsUnchanged('previousHash')
+  })
+
+  it('rejects invalid trusted release metadata before changing the spec or pin', async () => {
+    await proposeContractChange()
+    await writeFile(packagePath, '{"name":"bralecli","version":"latest"}')
+    await rejectsUnchanged('CLI version')
+  })
+
+  it('rejects excessive document depth before changing any trusted files', async () => {
+    let nested: unknown = { type: 'string' }
+    for (let depth = 0; depth < 140; depth++) nested = { items: nested }
+    const document = JSON.parse(baseDocument.toString('utf8'))
+    document.components.schemas.Deep = nested
+    const body = Buffer.from(JSON.stringify(document))
+    await writeFile(join(proposalDirectory, 'brale.json'), body)
+    await writeFile(
+      join(proposalDirectory, 'revision.json'),
+      JSON.stringify({ ...proposal, hash: hash('sha256', body) }),
+    )
+    await rejectsUnchanged('depth limit')
   })
 
   for (const entry of ['spec.ts', '.hidden', 'nested/file']) {

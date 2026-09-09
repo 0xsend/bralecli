@@ -23,6 +23,13 @@ verify the changes and repository protections from concrete evidence.
   and artifact; spec PRs show compatibility failures; unrun checks are labeled as such.
 - Idempotency: refresh tests prove unchanged bytes preserve the document and date,
   including repeated proposals; one fixed bot branch prevents daily duplicate PRs.
+- Release correctness: semantic spec fixtures distinguish contract changes from
+  annotations. All four native jobs pass project checks and the standalone smoke
+  harness. Artifact tests reject wrong identity, digest, file type, archive paths
+  and incomplete platform sets before the writer can upload.
+- Release recovery: HTTP integration tests prove draft-only creation, exact asset
+  verification, resumption of matching uploads, conflict rejection and preservation
+  of published releases. Published releases are never an automation output.
 
 ## Oracle
 
@@ -58,3 +65,9 @@ and manual dependency patch workflow retain the exceptions documented in SPEC.md
 reopens the draft PR to trigger pull-request CI. Manual dispatch is diagnostic;
 acceptance requires all seven checks attached to the current PR revision.
 Evidence: [repository verification](SPEC.md#decisions).
+
+2026-09-09, ratified by request: spec PRs propose version/changelog changes and
+reviewed versions produce four-platform verified draft releases. Public
+publication of v0.2.0 is authorized; future drafts require a maintainer to publish.
+Release builds use fresh native hosted VMs with read-only repository tokens;
+the separate draft writer never installs dependencies or executes artifacts.

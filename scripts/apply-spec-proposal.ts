@@ -2,8 +2,8 @@
 
 /** Validates untrusted data, then reconstructs pins from the trusted checkout. */
 import { constants } from 'node:fs'
-import { lstat, open, opendir, readFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { lstat, mkdtemp, open, opendir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 import { parseArgs } from 'node:util'
 
 import {
@@ -18,11 +18,33 @@ import {
   specPath,
   updatePin,
   validateDocument,
-  writeProposal,
   type RefreshResult,
 } from './spec-proposal.ts'
+import { planSpecRelease } from './spec-release.ts'
 
 const maxMetadataBytes = 4096
+const packagePath = new URL('../apps/cli/package.json', import.meta.url)
+const changelogPath = new URL('../apps/cli/CHANGELOG.md', import.meta.url)
+
+async function applyFiles(
+  files: readonly { path: string | URL; body: Buffer | string }[],
+): Promise<void> {
+  const staging = await mkdtemp(join(dirname(specPath), '.apply-spec-'))
+  try {
+    await Promise.all(
+      files.map((file, index) => writeFile(join(staging, String(index)), file.body)),
+    )
+    // Atomicity: each rename is atomic. Interrupted application fails the base
+    // hash precondition on retry. Permanent — the disposable checkout is only
+    // published after every write succeeds, as one Git commit.
+    await rename(join(staging, '0'), files[0]!.path)
+    await Promise.all(
+      files.slice(1).map((file, index) => rename(join(staging, String(index + 1)), file.path)),
+    )
+  } finally {
+    await rm(staging, { recursive: true, force: true })
+  }
+}
 
 async function validateDirectory(path: string): Promise<void> {
   const stat = await lstat(path)
@@ -90,11 +112,13 @@ async function main(): Promise<void> {
   const directory = values['proposal-dir']
   if (!directory) throw new Error('--proposal-dir is required')
   await validateDirectory(directory)
-  const [body, metadata, current, source] = await Promise.all([
+  const [body, metadata, current, source, packageSource, changelogSource] = await Promise.all([
     readProposalFile(join(directory, 'brale.json'), maxDocumentBytes),
     readProposalFile(join(directory, 'revision.json'), maxMetadataBytes),
     readFile(specPath),
     readFile(pinPath, 'utf8'),
+    readFile(packagePath, 'utf8'),
+    readFile(changelogPath, 'utf8'),
   ])
   validateDocument(body)
   const revision = parseRevision(metadata)
@@ -108,8 +132,36 @@ async function main(): Promise<void> {
   if (revision.hash !== sha256(body))
     throw new Error('Proposal document does not match its declared hash')
   if (revision.hash === currentHash) throw new Error('Proposal document is unchanged')
-  await writeProposal(body, updatePin(source, revision))
-  console.log(JSON.stringify(revision))
+  const release = planSpecRelease({
+    previousDocument: current,
+    document: body,
+    packageSource,
+    changelogSource,
+    revision,
+  })
+  await applyFiles([
+    { path: specPath, body },
+    { path: pinPath, body: updatePin(source, revision) },
+    ...(release.kind === 'release'
+      ? [
+          { path: packagePath, body: release.packageSource },
+          { path: changelogPath, body: release.changelogSource },
+        ]
+      : []),
+  ])
+  console.log(
+    JSON.stringify({
+      ...revision,
+      release:
+        release.kind === 'release'
+          ? {
+              kind: release.kind,
+              previousVersion: release.previousVersion,
+              version: release.version,
+            }
+          : release,
+    }),
+  )
 }
 
 try {

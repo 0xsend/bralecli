@@ -122,7 +122,7 @@ jobs:
           artifact-ids: ${{ needs.prepare.outputs.artifact-id }}
           merge-multiple: true
           path: ${{ runner.temp }}/spec-update
-      - name: Validate data and reconstruct trusted pin
+      - name: Validate data and propose version from trusted source
         run: node scripts/apply-spec-proposal.ts --proposal-dir "$RUNNER_TEMP/spec-update"
       - name: Create or update draft PR
         id: proposal
@@ -133,13 +133,21 @@ jobs:
           add-paths: |
             packages/brale/openapi/brale.json
             packages/brale/src/spec.ts
+            apps/cli/package.json
+            apps/cli/CHANGELOG.md
           commit-message: 'chore(spec): refresh Brale OpenAPI contract'
           title: 'chore(spec): refresh Brale OpenAPI contract'
           draft: always-true
           maintainer-can-modify: false
           body: |
             Brale's upstream OpenAPI bytes changed. This PR updates the vendored
-            document and its SHA-256/fetch-date pin; package versions are unchanged.
+            document and its SHA-256/fetch-date pin. A semantic contract change
+            also proposes a CLI version and changelog entry from trusted main.
+            Documentation-only or formatting-only updates keep the version unchanged.
+            Contract changes conservatively propose a minor release before 1.0,
+            and a major release from 1.0 onward; review the diff and adjust the
+            proposed version and release note when appropriate before merging.
+            A merged version change enters the draft-release build workflow.
 
             Upstream SHA-256: `${{ needs.prepare.outputs.hash }}`
 
@@ -152,8 +160,9 @@ jobs:
 
             Preparation installs no project dependencies. Compatibility runs on a
             separate runner in a credential-free, offline container. The publisher
-            validates the preparation artifact and reconstructs the pin from trusted
-            source; compatibility code cannot replace the proposed files.
+            validates the preparation artifact and reconstructs the pin, version,
+            and changelog from trusted source; compatibility code cannot replace
+            the proposed files. The artifact contains no package or changelog files.
 
             Review the contract diff, then close and reopen this draft PR as a
             maintainer to trigger pull-request CI under this repository's actor

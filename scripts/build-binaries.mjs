@@ -1,12 +1,25 @@
-// Run after nub ci: bun --no-env-file scripts/build-binaries.mjs /absolute/output/directory
+// Run after nub ci: bun --no-env-file scripts/build-binaries.mjs /absolute/output/directory [platform]
 // Bun 1.3.3 embeds the runtime; the checkout remains unchanged.
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
+
+import { compileBinaries } from './compile-binaries.mjs'
 
 if (Bun.version !== '1.3.3') throw new Error('This release recipe requires Bun 1.3.3')
 const root = process.cwd()
 const out = process.argv[2]
 if (!out?.startsWith('/')) throw new Error('Pass an absolute output directory')
+const targets = {
+  'darwin-arm64': 'darwin-arm64',
+  'darwin-x64': 'darwin-x64-baseline',
+  'linux-arm64': 'linux-arm64',
+  'linux-x64': 'linux-x64-baseline',
+}
+const requested = process.argv[3]
+if (process.argv.length > 4 || (requested !== undefined && !Object.hasOwn(targets, requested))) {
+  throw new Error(`Expected one platform: ${Object.keys(targets).join(', ')}`)
+}
+const platforms = requested === undefined ? Object.values(targets) : [targets[requested]]
 const head = Bun.spawnSync(['git', 'rev-parse', 'HEAD'], { cwd: root })
 if (head.exitCode !== 0) throw new Error('Cannot identify source revision')
 const revision = head.stdout.toString().trim()
@@ -66,33 +79,9 @@ const result = await Bun.build({
   ],
 })
 if (!result.success) throw new AggregateError(result.logs, 'Bundle failed')
-const platforms = ['darwin-arm64', 'darwin-x64-baseline', 'linux-arm64', 'linux-x64-baseline']
-await Promise.all(
-  platforms.map(async (platform) => {
-    const filename = `bralecli-${platform.replace('-baseline', '')}`
-    const child = Bun.spawn(
-      [
-        'bun',
-        'build',
-        intermediate,
-        '--compile',
-        `--target=bun-${platform}`,
-        '--no-compile-autoload-dotenv',
-        '--no-compile-autoload-bunfig',
-        '--env=disable',
-        '--outfile',
-        resolve(out, filename),
-      ],
-      { stdout: 'inherit', stderr: 'inherit' },
-    )
-    const timeout = setTimeout(() => child.kill(), 300_000)
-    const code = await child.exited
-    clearTimeout(timeout)
-    if (code !== 0) throw new Error(`Compile failed: ${platform}`)
-  }),
-)
+await compileBinaries({ compiler: process.execPath, intermediate, targets: platforms, out })
 await writeFile(
   resolve(out, 'build-info.json'),
   JSON.stringify({ revision, version, bun: Bun.version }, null, 2) + '\n',
 )
-console.log(`Built four targets from ${revision}`)
+console.log(`Built ${platforms.length} target(s) from ${revision}`)
