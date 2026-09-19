@@ -35,10 +35,10 @@ export const SPEC_SOURCE_URL: string = 'https://api.brale.xyz/openapi'
  * compares against this so a no-op refresh is visibly a no-op.
  */
 export const SPEC_SHA256: string =
-  '9c74b137981b0a98efedcc72ea3bb08acd2ab6bab6012e60ff83b98e826503fb'
+  'fd1edeaad80666809e719034c20042c7ed26c3fb13e9c05828e27ed8367c0857'
 
 /** When `SPEC_SHA256` was observed at `SPEC_SOURCE_URL`. */
-export const SPEC_FETCHED_AT: string = '2026-09-09'
+export const SPEC_FETCHED_AT: string = '2026-09-19'
 
 /** The single server the document advertises, and the only API host this CLI talks to. */
 export const BRALE_API_BASE_URL: string = 'https://api.brale.xyz'
