@@ -1,5 +1,14 @@
 # bralecli
 
+## 0.3.0
+
+### Minor Changes
+
+- Refresh the generated CLI for the Brale OpenAPI contract fetched on 2026-10-03
+  (SHA-256: `daa90a3368cd1648a787eb71f21b0debc8f0ede9e89256e3df284662d824c7f3`).
+- Propose a conservative pre-1.0 minor release because upstream contract changes may be breaking.
+  Maintainers review the contract diff and may adjust this version and release note before merging.
+
 ## 0.2.0
 
 ### Added
