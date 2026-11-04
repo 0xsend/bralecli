@@ -123,7 +123,19 @@ jobs:
           merge-multiple: true
           path: ${{ runner.temp }}/spec-update
       - name: Validate data and propose version from trusted source
-        run: node scripts/apply-spec-proposal.ts --proposal-dir "$RUNNER_TEMP/spec-update"
+        id: apply
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/apply-spec-proposal.ts --proposal-dir "$RUNNER_TEMP/spec-update" \
+            --summary-out "$RUNNER_TEMP/spec-changes.md"
+          cat "$RUNNER_TEMP/spec-changes.md" >> "$GITHUB_STEP_SUMMARY"
+          delimiter="spec_changes_$(openssl rand -hex 16)"
+          {
+            echo "summary<<$delimiter"
+            cat "$RUNNER_TEMP/spec-changes.md"
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
       - name: Create or update draft PR
         id: proposal
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
@@ -148,6 +160,10 @@ jobs:
             and a major release from 1.0 onward; review the diff and adjust the
             proposed version and release note when appropriate before merging.
             A merged version change enters the draft-release build workflow.
+
+            ${{ steps.apply.outputs.summary }}
+            This summary compares trusted main with the proposed document. Upstream
+            names appear verbatim in code spans; it does not replace the full diff.
 
             Upstream SHA-256: `${{ needs.prepare.outputs.hash }}`
 

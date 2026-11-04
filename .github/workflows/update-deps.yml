@@ -33,9 +33,19 @@ jobs:
           nub update
           nix flake update
 
-      - name: Install and verify
+      - name: Install updated dependencies
+        run: nub install
+
+      # Before verification, so the run summary explains what changed even when checks fail.
+      - name: Summarize dependency changes
+        shell: bash
         run: |
-          nub install
+          set -euo pipefail
+          node scripts/dependency-changes.ts > "$RUNNER_TEMP/dependency-update.md"
+          cat "$RUNNER_TEMP/dependency-update.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify
+        run: |
           nub run check
           nub run build
           nub run knip
@@ -44,10 +54,11 @@ jobs:
       - name: Prepare reviewable patch
         shell: bash
         run: |
+          set -euo pipefail
           git diff --binary -- .node-version nub.lock flake.lock package.json \
             apps/cli/package.json packages/brale/package.json > "$RUNNER_TEMP/dependency-update.patch"
           if [ -s "$RUNNER_TEMP/dependency-update.patch" ]; then
-            echo 'Download the dependency patch, review it, and apply it on a branch with git apply. Open a PR; this workflow does not push changes.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Download the dependency patch, review it, and apply it on a branch with git apply. Open a PR; this workflow does not push changes. The artifact also contains dependency-update.md, the change summary above, for the PR description.' >> "$GITHUB_STEP_SUMMARY"
           else
             echo 'Dependencies are already up to date; the patch is empty.' >> "$GITHUB_STEP_SUMMARY"
           fi
@@ -55,6 +66,8 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: dependency-update
-          path: ${{ runner.temp }}/dependency-update.patch
+          path: |
+            ${{ runner.temp }}/dependency-update.patch
+            ${{ runner.temp }}/dependency-update.md
           if-no-files-found: error
           retention-days: 7

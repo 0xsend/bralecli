@@ -113,6 +113,20 @@ describe('repository automation trust boundaries', () => {
     )
   })
 
+  it('dependency automation summarizes what changed before verification and uploads it with the patch', () => {
+    const steps = Object.values(workflow('update-deps').jobs).flatMap((job) => job.steps)
+    const index = (pattern: RegExp) => steps.findIndex((step) => pattern.test(step.run ?? ''))
+    const summary = steps[index(/node scripts\/dependency-changes\.ts/)]!
+    expect(summary.run).toContain('> "$RUNNER_TEMP/dependency-update.md"')
+    expect(summary.run).toContain('>> "$GITHUB_STEP_SUMMARY"')
+    expect(index(/^nub install$/m)).toBeLessThan(index(/dependency-changes/))
+    expect(index(/dependency-changes/)).toBeLessThan(index(/nub run check/))
+    const upload = steps.find((step) => step.uses?.startsWith('actions/upload-artifact@'))
+    expect(upload?.with?.path).toBe(
+      '${{ runner.temp }}/dependency-update.patch\n${{ runner.temp }}/dependency-update.md\n',
+    )
+  })
+
   it('spec automation runs once daily and manually, restricted to canonical main', () => {
     const config = workflow('update-spec')
     expect(Object.keys(config.on).toSorted()).toEqual(['schedule', 'workflow_dispatch'])
@@ -190,6 +204,19 @@ describe('repository automation trust boundaries', () => {
     expect(commands).not.toContain('spec-update/spec.ts')
     expect(commands).not.toMatch(/\b(?:nub|npm|npx|bun|source|eval)\b|gh\s+pr\s+(merge|review)/)
     expect(proposal?.with?.body).toContain('${{ needs.compatibility.result }}')
+  })
+
+  it('the spec writer publishes its change summary through a random output delimiter', () => {
+    const job = workflow('update-spec').jobs['pull-request']!
+    const apply = job.steps.find((step) => step.id === 'apply')!
+    expect(apply.run).toContain(
+      'node scripts/apply-spec-proposal.ts --proposal-dir "$RUNNER_TEMP/spec-update" \\\n  --summary-out "$RUNNER_TEMP/spec-changes.md"',
+    )
+    expect(apply.run).toContain('delimiter="spec_changes_$(openssl rand -hex 16)"')
+    expect(apply.run).toContain('>> "$GITHUB_STEP_SUMMARY"')
+    const proposal = job.steps.find((step) => step.id === 'proposal')
+    expect(proposal?.with?.body).toContain('${{ steps.apply.outputs.summary }}')
+    expect(proposal?.with?.['body-path']).toBeUndefined()
   })
 
   it('release preparation is confined to main with four native jobs before its isolated draft writer', () => {

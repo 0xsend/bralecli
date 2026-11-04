@@ -27,7 +27,9 @@ updating the default branch.
   force pushes, or branch deletion are allowed.
 - REQ-REPO-005: Dependency updates are manually requested on main and produce a
   downloadable patch. Dependency automation does not push commits or create PRs.
-  No automation approves or merges PRs.
+  No automation approves or merges PRs. Before verification, the run summary
+  reports the Node version, direct dependency specifiers and resolutions, Nix input
+  revisions, and all locked package changes; the artifact carries the same summary.
 - REQ-REPO-006: The spec updater runs daily at 08:23 UTC, or manually on main,
   in the canonical repository only. A bounded fetch compares the upstream raw
   bytes, preserving them exactly. Unchanged bytes produce no file/date changes;
@@ -40,6 +42,9 @@ updating the default branch.
   compatibility checks and opens a draft even when those checks fail, so upstream
   changes remain visible. Fetch/preparation failures do not publish a proposal.
   Version proposals require maintainer review; public releases require publication.
+  The writer adds a builtin-only summary of added, removed, and changed operations,
+  components, and document fields against trusted main to the PR body and run summary.
+  Upstream names appear only in sanitized code spans, and the summary is size-bounded.
 - REQ-REPO-008: Preparation installs no project dependencies and uploads only
   raw spec bytes and revision metadata. Compatibility runs in a separate job.
   The publisher downloads the preparation artifact by immutable ID, rejects
@@ -134,6 +139,10 @@ REQ-REPO-009; maintainers review its main-branch inputs before running it.
       the source revision, archive digests and published immutability are verified.
 
 ## Decisions
+
+- 2026-11-04, ratified by request: spec proposals and dependency patches include
+  generated change summaries, because the vendored spec is one minified line and its
+  raw diff is not reviewable.
 
 - 2026-09-09, ratified by request: implement spec version/changelog proposals,
   verified four-platform builds and draft releases; deliver v0.2.0. Future public
