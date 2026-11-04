@@ -45,9 +45,13 @@ beforeEach(async () => {
     ),
   )
   await Promise.all([
-    ...['apply-spec-proposal.ts', 'spec-proposal.ts', 'spec-release.ts'].map((name) =>
-      copyFile(new URL(`./${name}`, import.meta.url), join(root, 'scripts', name)),
-    ),
+    ...[
+      'apply-spec-proposal.ts',
+      'spec-proposal.ts',
+      'spec-release.ts',
+      'spec-changes.ts',
+      'markdown.ts',
+    ].map((name) => copyFile(new URL(`./${name}`, import.meta.url), join(root, 'scripts', name))),
     writeFile(join(root, 'package.json'), '{"type":"module"}'),
     writeFile(documentPath, baseDocument),
     writeFile(sourcePath, baseSource),
@@ -62,18 +66,21 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true })
 })
 
-function apply(directory = proposalDirectory): Promise<{ stdout: string; stderr: string }> {
+function apply(
+  directory = proposalDirectory,
+  extra: string[] = [],
+): Promise<{ stdout: string; stderr: string }> {
   return execute(
     process.execPath,
-    [join(root, 'scripts/apply-spec-proposal.ts'), '--proposal-dir', directory],
+    [join(root, 'scripts/apply-spec-proposal.ts'), '--proposal-dir', directory, ...extra],
     { cwd: root, env: {}, timeout: 5_000 },
   )
 }
 
-async function rejectsUnchanged(message: string): Promise<void> {
+async function rejectsUnchanged(message: string, extra: string[] = []): Promise<void> {
   const paths = [documentPath, sourcePath, packagePath, changelogPath]
   const before = await Promise.all(paths.map((path) => readFile(path)))
-  await expect(apply()).rejects.toMatchObject({
+  await expect(apply(proposalDirectory, extra)).rejects.toMatchObject({
     stdout: '',
     stderr: expect.stringContaining(message),
   })
@@ -118,6 +125,25 @@ describe('trusted application of data-only spec proposals', () => {
     expect(await readFile(changelogPath, 'utf8')).toContain(hash('sha256', body))
     expect(await readFile(documentPath)).toEqual(body)
     await rejectsUnchanged('previousHash')
+  })
+
+  it('writes a reviewer summary of the contract change when asked', async () => {
+    await proposeContractChange()
+    const summaryPath = join(root, 'spec-changes.md')
+    await apply(proposalDirectory, ['--summary-out', summaryPath])
+    const summary = await readFile(summaryPath, 'utf8')
+    expect(summary).toContain('proposes version `0.3.0`')
+    expect(summary).toContain(
+      '- Removed `GET /accounts/{account_id}/financial-institutions/{fi_id}/status`',
+    )
+  })
+
+  it('never overwrites an existing summary file and then leaves trusted files unchanged', async () => {
+    await proposeContractChange()
+    const summaryPath = join(root, 'spec-changes.md')
+    await writeFile(summaryPath, 'existing')
+    await rejectsUnchanged('EEXIST', ['--summary-out', summaryPath])
+    expect(await readFile(summaryPath, 'utf8')).toBe('existing')
   })
 
   it('rejects invalid trusted release metadata before changing the spec or pin', async () => {
