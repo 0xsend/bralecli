@@ -24,7 +24,9 @@ updating the default branch.
 - REQ-REPO-004: The default branch requires a PR, one code-owner approval from
   someone other than the latest pusher, dismissal of stale approvals, resolved
   review threads, and all seven CI checks on up-to-date code. No bypass actors,
-  force pushes, or branch deletion are allowed.
+  force pushes, or branch deletion are allowed. The visible `@0xsend/bralecli-admins`
+  team, which has write access, owns every path; any one member's approval satisfies
+  code-owner review.
 - REQ-REPO-005: Dependency updates are manually requested on main and produce a
   downloadable patch. Dependency automation does not push commits or create PRs.
   No automation approves or merges PRs. Before verification, the run summary
@@ -111,7 +113,8 @@ REQ-REPO-009; maintainers review its main-branch inputs before running it.
 - [ ] REQ-REPO-001: YAML parsing and independent template review pass.
 - [ ] REQ-REPO-002: Active Actions policy shows the two roles and four events.
 - [ ] REQ-REPO-003/005: `nub run test` includes the repository policy tests; actionlint passes.
-- [ ] REQ-REPO-004: Live ruleset matches `.github/rules/main.json` with no bypass actors.
+- [ ] REQ-REPO-004: Live ruleset matches `.github/rules/main.json` with no bypass actors;
+      GitHub reports no CODEOWNERS errors for the default branch.
 - [ ] REQ-REPO-003/004: All seven required CI checks appear on the current PR
       revision and pass; token defaults are read-only.
 - [ ] REQ-REPO-006/007: Refresh integration tests cover changed/unchanged bytes,
@@ -140,6 +143,10 @@ REQ-REPO-009; maintainers review its main-branch inputs before running it.
 
 ## Decisions
 
+- 2026-11-04, ratified by request: code ownership moves from four named maintainers
+  to the visible `@0xsend/bralecli-admins` team with the same four members, so each PR
+  requests one team review. The secret `@0xsend/admin` team was not used, because
+  code-owner teams must be visible and that would change org-wide team visibility and access.
 - 2026-11-04, ratified by request: spec proposals and dependency patches include
   generated change summaries, because the vendored spec is one minified line and its
   raw diff is not reviewable.

@@ -70,6 +70,14 @@ describe('repository automation trust boundaries', () => {
     })
   }
 
+  it('one visible maintainer team owns every path', () => {
+    const rules = readFileSync(new URL('../.github/CODEOWNERS', import.meta.url), 'utf8')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('#'))
+    expect(rules).toEqual(['* @0xsend/bralecli-admins'])
+  })
+
   it('CI accepts only push, pull request, and manual triggers', () => {
     expect(Object.keys(workflow('ci').on).toSorted()).toEqual([
       'pull_request',
