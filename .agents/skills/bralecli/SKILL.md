@@ -104,8 +104,3 @@ After a timeout or ambiguous write response, reconcile using read commands and
 known IDs before deciding what happened. Do not automatically repeat a create,
 mint, burn, replay, or other non-idempotent write, even if an error is labeled
 retryable. If the outcome cannot be identified, report it as unknown.
-
-The vendored address variant of `create_update_link_token` has a mismatched path
-parameter (`fi_id` versus `{address_id}`); do not rely on that operation until the
-installed version's contract fixes it. Report this limitation instead of
-guessing a replacement positional argument.
