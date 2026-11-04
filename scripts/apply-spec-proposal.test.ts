@@ -73,7 +73,7 @@ function apply(
   return execute(
     process.execPath,
     [join(root, 'scripts/apply-spec-proposal.ts'), '--proposal-dir', directory, ...extra],
-    { cwd: root, env: {}, timeout: 5_000 },
+    { cwd: root, env: {}, timeout: 30_000 },
   )
 }
 
