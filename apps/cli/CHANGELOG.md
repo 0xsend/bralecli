@@ -1,5 +1,23 @@
 # bralecli
 
+## 0.3.0
+
+### Minor Changes
+
+- Refresh the generated CLI for the Brale OpenAPI contract fetched on 2026-11-04
+  (SHA-256: `3378b8f911e0681084b632620e58b329444acf97f5db49fe96615e4833b7384e`).
+- Add `update_automation_destination` and `simulate_automation_deposit`.
+- **Breaking:** `create_update_link_token` now targets financial institutions
+  (`<account_id> <fi_id>`), replacing `create_update_link_token (2)`. The bank
+  account address variant is now `create_address_update_link_token`
+  (`<account_id> <address_id>`).
+
+### Fixed
+
+- The bank account address update-link-token command now accepts its
+  `<address_id>` argument. Brale's earlier contract declared `fi_id` for that path,
+  so the previous command could not fill it.
+
 ## 0.2.0
 
 ### Added

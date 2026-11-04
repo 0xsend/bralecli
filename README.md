@@ -248,12 +248,6 @@ no pattern, and the generator interpolates path arguments verbatim, so an
 unconstrained `get_transfer '../other'` would retarget the request after URL
 normalization. `constrainPathParameters` turns that into a validation error.
 
-One command is broken upstream: `create_update_link_token` (the addresses
-variant) declares `fi_id` where its path says `{address_id}` in Brale's own
-document, so the generated command cannot fill that segment. The defect is
-pinned by a test in `packages/brale/src/spec.test.ts`; when Brale fixes the
-document, the pin fails and both it and this caveat come out.
-
 ## The vendored spec
 
 Brale serves its machine-readable contract from the API host itself,

@@ -100,17 +100,12 @@ describe('the assumptions the generated surface is built on', () => {
         if (!names.has(String(segment)))
           unresolved.push(`${method.toUpperCase()} ${path} -> {${segment}}`)
     }
-    // One KNOWN upstream defect, pinned rather than allowlisted by shape:
-    // Brale's addresses/update-link-token operation is a copy of the
-    // financial-institutions one (its sibling even carries the deduped
-    // operationId `create_update_link_token (2)`) and declares `fi_id`
-    // where its path says `{address_id}`. The generated command cannot fill
-    // that segment; nothing on this side can repair it without guessing
-    // semantics. When Brale fixes the document, this assertion fails and the
-    // pin — plus the README caveat — comes out.
-    expect(unresolved).toEqual([
-      'POST /accounts/{account_id}/addresses/{address_id}/update-link-token -> {address_id}',
-    ])
+    // A generated command cannot fill a segment its operation does not declare,
+    // and nothing on this side can repair one without guessing semantics. Brale's
+    // addresses/update-link-token operation once declared `fi_id` for its
+    // `{address_id}` segment; the 2026-11-04 contract fixed it. Report any recurrence
+    // upstream and caveat the affected command rather than allowlisting it here.
+    expect(unresolved).toEqual([])
   })
 
   it('leaves every path parameter unconstrained at the source', () => {
