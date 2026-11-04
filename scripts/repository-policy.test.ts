@@ -70,6 +70,14 @@ describe('repository automation trust boundaries', () => {
     })
   }
 
+  it('one visible maintainer team owns every path', () => {
+    const rules = readFileSync(new URL('../.github/CODEOWNERS', import.meta.url), 'utf8')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('#'))
+    expect(rules).toEqual(['* @0xsend/bralecli-admins'])
+  })
+
   it('CI accepts only push, pull request, and manual triggers', () => {
     expect(Object.keys(workflow('ci').on).toSorted()).toEqual([
       'pull_request',
@@ -110,6 +118,20 @@ describe('repository automation trust boundaries', () => {
     expect(steps.some((step) => step.uses?.startsWith('actions/upload-artifact@'))).toBe(true)
     expect(steps.map((step) => step.run ?? '').join('\n')).not.toMatch(
       /git\s+push|gh\s+pr\s+(create|merge|review)/,
+    )
+  })
+
+  it('dependency automation summarizes what changed before verification and uploads it with the patch', () => {
+    const steps = Object.values(workflow('update-deps').jobs).flatMap((job) => job.steps)
+    const index = (pattern: RegExp) => steps.findIndex((step) => pattern.test(step.run ?? ''))
+    const summary = steps[index(/node scripts\/dependency-changes\.ts/)]!
+    expect(summary.run).toContain('> "$RUNNER_TEMP/dependency-update.md"')
+    expect(summary.run).toContain('>> "$GITHUB_STEP_SUMMARY"')
+    expect(index(/^nub install$/m)).toBeLessThan(index(/dependency-changes/))
+    expect(index(/dependency-changes/)).toBeLessThan(index(/nub run check/))
+    const upload = steps.find((step) => step.uses?.startsWith('actions/upload-artifact@'))
+    expect(upload?.with?.path).toBe(
+      '${{ runner.temp }}/dependency-update.patch\n${{ runner.temp }}/dependency-update.md\n',
     )
   })
 
@@ -190,6 +212,19 @@ describe('repository automation trust boundaries', () => {
     expect(commands).not.toContain('spec-update/spec.ts')
     expect(commands).not.toMatch(/\b(?:nub|npm|npx|bun|source|eval)\b|gh\s+pr\s+(merge|review)/)
     expect(proposal?.with?.body).toContain('${{ needs.compatibility.result }}')
+  })
+
+  it('the spec writer publishes its change summary through a random output delimiter', () => {
+    const job = workflow('update-spec').jobs['pull-request']!
+    const apply = job.steps.find((step) => step.id === 'apply')!
+    expect(apply.run).toContain(
+      'node scripts/apply-spec-proposal.ts --proposal-dir "$RUNNER_TEMP/spec-update" \\\n  --summary-out "$RUNNER_TEMP/spec-changes.md"',
+    )
+    expect(apply.run).toContain('delimiter="spec_changes_$(openssl rand -hex 16)"')
+    expect(apply.run).toContain('>> "$GITHUB_STEP_SUMMARY"')
+    const proposal = job.steps.find((step) => step.id === 'proposal')
+    expect(proposal?.with?.body).toContain('${{ steps.apply.outputs.summary }}')
+    expect(proposal?.with?.['body-path']).toBeUndefined()
   })
 
   it('release preparation is confined to main with four native jobs before its isolated draft writer', () => {

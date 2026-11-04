@@ -1,2 +1,4 @@
-# Maintainers review all changes, including changes to these ownership rules.
-* @alleneubank @ethentree @beezybarg @eho-send
+# One approval from any @0xsend/bralecli-admins member satisfies code-owner review for
+# all changes, including changes to these ownership rules. The team must stay visible and
+# keep write access; otherwise GitHub ignores this line and stops requiring that review.
+* @0xsend/bralecli-admins

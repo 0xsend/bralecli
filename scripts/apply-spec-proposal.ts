@@ -20,6 +20,7 @@ import {
   validateDocument,
   type RefreshResult,
 } from './spec-proposal.ts'
+import { summarizeSpecChanges } from './spec-changes.ts'
 import { planSpecRelease } from './spec-release.ts'
 
 const maxMetadataBytes = 4096
@@ -108,7 +109,9 @@ function parseRevision(body: Buffer): RefreshResult {
 }
 
 async function main(): Promise<void> {
-  const { values } = parseArgs({ options: { 'proposal-dir': { type: 'string' } } })
+  const { values } = parseArgs({
+    options: { 'proposal-dir': { type: 'string' }, 'summary-out': { type: 'string' } },
+  })
   const directory = values['proposal-dir']
   if (!directory) throw new Error('--proposal-dir is required')
   await validateDirectory(directory)
@@ -139,6 +142,16 @@ async function main(): Promise<void> {
     changelogSource,
     revision,
   })
+  const summaryPath = values['summary-out']
+  if (summaryPath) {
+    // Written before trusted files change, and never over an existing file.
+    const summary = summarizeSpecChanges({
+      previous: parseJson(current, 'Base document'),
+      next: parseJson(body, 'Proposal document'),
+      proposedVersion: release.kind === 'release' ? release.version : undefined,
+    })
+    await writeFile(summaryPath, summary, { flag: 'wx' })
+  }
   await applyFiles([
     { path: specPath, body },
     { path: pinPath, body: updatePin(source, revision) },
