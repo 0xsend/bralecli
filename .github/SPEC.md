@@ -17,7 +17,7 @@ updating the default branch.
 - REQ-REPO-003: Workflows default to read-only contents permissions, hosted runners,
   bounded timeouts, commit-pinned actions, and checkout without persisted credentials.
   Fork workflows receive no write tokens or secrets. The spec PR job receives
-  contents and pull-requests write permissions; the release draft job receives
+  contents and pull-requests write permissions; the release writer job receives
   contents write permission. Neither writer installs dependencies
   or execute project checks or the refreshed spec. Its builtin-only validator
   runs from the trusted main revision selected when the workflow started.
@@ -43,7 +43,7 @@ updating the default branch.
   Only the vendored document, pin, CLI package version and changelog enter its PR. The updater reports
   compatibility checks and opens a draft even when those checks fail, so upstream
   changes remain visible. Fetch/preparation failures do not publish a proposal.
-  Version proposals require maintainer review; public releases require publication.
+  Version proposals require maintainer review; merging one publishes its release.
   The writer adds a builtin-only summary of added, removed, and changed operations,
   components, and document fields against trusted main to the PR body and run summary.
   Upstream names appear only in sanitized code spans, and the summary is size-bounded.
@@ -79,16 +79,18 @@ updating the default branch.
   never executes a downloaded binary. Drafts contain four archives, SHA256SUMS,
   and build-info.json. Only artifacts from the same successful workflow run enter
   this writer.
-- REQ-REPO-013: Automation creates draft releases only. Repeated runs preserve
-  complete releases; interrupted draft uploads reconcile matching assets and fail
-  on conflicts rather than replacing bytes. A published version is never changed.
-  Client PRs include reviewed version/changelog changes when a release is needed;
-  multiple changes may share one release. Maintainers attach every asset before
-  publishing, because repository immutability locks future published releases.
+- REQ-REPO-013: Merging a reviewed version change to main is the release decision.
+  The writer first creates a draft; interrupted draft uploads reconcile matching
+  assets and fail on conflicts rather than replacing bytes. It then publishes only a
+  draft for the exact source revision whose six assets match the verified files, and
+  confirms the published tag and immutability afterwards. Latest moves only to a
+  version above every published stable release. A published version is never changed;
+  corrections ship as a new version. Client PRs include reviewed version/changelog
+  changes when a release is needed; multiple changes may share one release.
 - REQ-REPO-014: The v0.2.0 release contains the reviewed onboarding commands and
   refreshed contract. All four exact shipped binaries pass the smoke harness;
   release metadata identifies their source revision and checksums. Publication
-  of this version is authorized by the user; future publications remain manual.
+  of this version is authorized by the user.
 
 ## Invariants and non-goals
 
@@ -96,8 +98,8 @@ Workflow jobs never receive Brale credentials or move funds. External contributo
 cannot initiate this repository's CI; workflows run independently in their own
 forks are outside this repository's control. Maintainers inspect outside changes
 before bringing them onto a repository branch for CI. There is no npm package
-publication or automatic public release workflow. Repository visibility and licensing do not
-change as part of these protections.
+publication. The release workflow publishes only the verified drafts of REQ-REPO-013.
+Repository visibility and licensing do not change as part of these protections.
 
 The isolation assumes reviewed workflow, runner and publisher definitions. The
 Docker verifier (`scripts/ci-sandbox.test.mjs`) also executes on the host and is
@@ -135,6 +137,10 @@ REQ-REPO-009; maintainers review its main-branch inputs before running it.
 - [x] REQ-REPO-012/013: Archive validation and HTTP integration tests pass; existing
       lightweight and annotated tags must resolve to the build commit; conflicting
       release assets cause zero replacement writes. Script typechecks run in CI.
+- [ ] REQ-REPO-013: HTTP integration tests publish only a complete matching draft,
+      choose Latest numerically, refuse missing, incomplete, conflicting, published
+      or mistagged drafts without writing, and fail when immutability is absent.
+      The first release after this change publishes itself as Latest and immutable.
 - [x] REQ-REPO-011/013: Workflow policy tests and actionlint verify native runner
       mappings, main-only execution, successful-build dependencies, stable artifact
       names across failed-job reruns and draft writer isolation.
@@ -143,6 +149,13 @@ REQ-REPO-009; maintainers review its main-branch inputs before running it.
 
 ## Decisions
 
+- 2026-11-05, ratified by request: releases publish automatically once the writer
+  has verified the complete draft. This supersedes the 2026-09-09 decision that public
+  releases are manual. Native builds, smoke tests and artifact validation already
+  cover the manual checks, and the version change already needs a code-owner approval.
+  A maintainer holds a release by not merging its version change. Rerunning the failed
+  jobs of a run resumes its publication; drafts whose run cannot be rerun are
+  reviewed and published by hand.
 - 2026-11-04, ratified by request: code ownership moves from four named maintainers
   to the visible `@0xsend/bralecli-admins` team with the same four members, so each PR
   requests one team review. The secret `@0xsend/admin` team was not used, because

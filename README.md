@@ -289,10 +289,10 @@ continues to leave pin updates for the maintainer. Invalid downloads fail before
 writing the spec; compatibility failures are reported in the draft PR and run
 logs. The bot owns its branch, so make follow-up fixes on a separate branch.
 
-After a reviewed version update reaches `main`, **Prepare Release** builds and
-smoke-tests all four standalone executables and prepares a draft release.
-Maintainers review and publish the completed draft; publication locks its assets
-under repository release immutability. Installed executables retain their embedded
+After a reviewed version update reaches `main`, **Release** builds and
+smoke-tests all four standalone executables, drafts the release, verifies the draft
+and publishes it. Merging the version change is therefore the decision to release.
+Publication locks the assets and tag under repository release immutability. Installed executables retain their embedded
 contract until users install a new release.
 
 Activation, the maintainer CI handoff and release operation are described in

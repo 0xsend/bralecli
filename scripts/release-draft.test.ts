@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { createHash } from 'node:crypto'
 import { afterEach, expect, it } from 'vitest'
 
-import { githubApi, inspectRelease, uploadDraft } from './release-draft.ts'
+import { githubApi, inspectRelease, publishRelease, uploadDraft } from './release-draft.ts'
 
 const version = '0.2.0'
 const revision = 'a'.repeat(40)
@@ -31,6 +31,8 @@ async function fixture() {
   let failUpload = false
   let tag: unknown
   let annotatedTag: unknown
+  let others: Record<string, unknown>[] = []
+  let immutable = true
   const server = createServer(async (request, response) => {
     const chunks: Buffer[] = []
     for await (const chunk of request) chunks.push(chunk)
@@ -48,11 +50,20 @@ async function fixture() {
         return
       }
       response.end(
-        JSON.stringify(url.pathname.endsWith('/releases') ? (release ? [release] : []) : release),
+        JSON.stringify(
+          url.pathname.endsWith('/releases') ? [...others, ...(release ? [release] : [])] : release,
+        ),
       )
       return
     }
     writes.push({ method: request.method!, path: url.pathname, body })
+    if (request.method === 'PATCH') {
+      // Publishing creates the tag at the draft's target, as GitHub does.
+      release = { ...release, ...JSON.parse(body.toString()), immutable }
+      tag ??= { object: { type: 'commit', sha: release.target_commitish } }
+      response.end(JSON.stringify(release))
+      return
+    }
     if (url.pathname.endsWith('/releases')) {
       const data = JSON.parse(body.toString())
       release = {
@@ -112,7 +123,23 @@ async function fixture() {
     set annotatedTag(value: unknown) {
       annotatedTag = value
     },
+    set others(value: Record<string, unknown>[]) {
+      others = value
+    },
+    set immutable(value: boolean) {
+      immutable = value
+    },
   }
+}
+
+function published(tag: string, prerelease = false) {
+  return { tag_name: tag, draft: false, prerelease }
+}
+
+function patches(writes: { method: string; body: Buffer }[]) {
+  return writes
+    .filter((entry) => entry.method === 'PATCH')
+    .map((entry) => JSON.parse(entry.body.toString()) as unknown)
 }
 
 it('creates only a draft, uploads the exact six files and preserves it on retry', async () => {
@@ -215,3 +242,60 @@ it.each(['commit', 'tag'])(
     expect(test.assets).toHaveLength(6)
   },
 )
+
+it('publishes the complete verified draft as Latest when it is the newest stable version', async () => {
+  const test = await fixture()
+  test.others = [published('v0.1.1'), published('v0.9.0', true), published('not-a-version')]
+  await uploadDraft(test.api, { version, revision, directory: test.directory, notes: 'Notes' })
+  expect(await publishRelease(test.api, { version, revision, directory: test.directory })).toEqual({
+    url: 'https://github.com/0xsend/bralecli/releases/tag/v0.2.0',
+    draft: false,
+    latest: true,
+  })
+  expect(patches(test.writes)).toEqual([{ draft: false, make_latest: 'true' }])
+  expect(test.writes.at(-1)?.path).toBe('/repos/0xsend/bralecli/releases/123')
+  expect(await inspectRelease(test.api, version)).toMatchObject({ prepare: false, published: true })
+})
+
+it('publishes an older version without taking Latest from a newer release', async () => {
+  const test = await fixture()
+  // Numeric, not lexical: 0.10.0 is newer than 0.2.0.
+  test.others = [published('v0.10.0')]
+  await uploadDraft(test.api, { version, revision, directory: test.directory, notes: 'Notes' })
+  await expect(
+    publishRelease(test.api, { version, revision, directory: test.directory }),
+  ).resolves.toMatchObject({ latest: false })
+  expect(patches(test.writes)).toEqual([{ draft: false, make_latest: 'false' }])
+})
+
+it.each(['missing', 'incomplete', 'revision', 'digest', 'published', 'tag'])(
+  'refuses to publish without writing when the draft check fails: %s',
+  async (problem) => {
+    const test = await fixture()
+    if (problem === 'incomplete') test.failUpload = true
+    if (problem !== 'missing')
+      await uploadDraft(test.api, {
+        version,
+        revision,
+        directory: test.directory,
+        notes: 'Notes',
+      }).catch(() => undefined)
+    if (problem === 'revision') test.release!.target_commitish = 'b'.repeat(40)
+    if (problem === 'digest') test.assets[0]!.digest = `sha256:${'f'.repeat(64)}`
+    if (problem === 'published') test.release!.draft = false
+    if (problem === 'tag') test.tag = { object: { type: 'commit', sha: 'b'.repeat(40) } }
+    await expect(
+      publishRelease(test.api, { version, revision, directory: test.directory }),
+    ).rejects.toThrow()
+    expect(patches(test.writes)).toEqual([])
+  },
+)
+
+it('fails loudly when GitHub does not lock the published release', async () => {
+  const test = await fixture()
+  test.immutable = false
+  await uploadDraft(test.api, { version, revision, directory: test.directory, notes: 'Notes' })
+  await expect(
+    publishRelease(test.api, { version, revision, directory: test.directory }),
+  ).rejects.toThrow(/immutable/)
+})

@@ -53,7 +53,7 @@ describe('repository automation trust boundaries', () => {
         expect(job.permissions ?? config.permissions).toEqual(
           name === 'update-spec' && id === 'pull-request'
             ? { contents: 'write', 'pull-requests': 'write' }
-            : name === 'release' && id === 'draft'
+            : name === 'release' && id === 'publish'
               ? { contents: 'write' }
               : { contents: 'read' },
         )
@@ -227,7 +227,7 @@ describe('repository automation trust boundaries', () => {
     expect(proposal?.with?.['body-path']).toBeUndefined()
   })
 
-  it('release preparation is confined to main with four native jobs before its isolated draft writer', () => {
+  it('releases run on main only, with four native jobs before an isolated writer that drafts, then publishes', () => {
     const config = workflow('release')
     expect(Object.keys(config.on).toSorted()).toEqual(['push', 'workflow_dispatch'])
     expect(config.on.push).toEqual({ branches: ['main'] })
@@ -254,22 +254,25 @@ describe('repository automation trust boundaries', () => {
     expect(build).toContain('nub run check')
     expect(build).toContain('scripts/smoke-binary.py')
     expect(build).toContain('scripts/release-artifacts.ts package')
-    const job = config.jobs.draft!
+    const job = config.jobs.publish!
     expect(job.needs).toEqual(['candidate', 'build'])
     expect(job.permissions).toEqual({ contents: 'write' })
-    expect(job.steps.map((step) => step.run ?? '').join('\n')).toContain(
-      'scripts/release-draft.ts upload',
+    const runs = job.steps.map((step) => step.run ?? '')
+    const upload = runs.findIndex((run) => run.includes('scripts/release-draft.ts upload'))
+    const publish = runs.findIndex((run) =>
+      run.includes('scripts/release-draft.ts publish "$RUNNER_TEMP/verified-release"'),
     )
-    expect(job.steps.map((step) => step.run ?? '').join('\n')).not.toMatch(
-      /\b(?:npm|nub|bun|npx|python3)\b|--draft=false/,
-    )
+    // Only the trusted script publishes, after it has drafted and verified every asset.
+    expect(upload).toBeGreaterThanOrEqual(0)
+    expect(publish).toBeGreaterThan(upload)
+    expect(runs.join('\n')).not.toMatch(/\b(?:npm|nub|bun|npx|python3|gh)\b|--draft=false/)
     const download = job.steps.find((step) => step.uses?.startsWith('actions/download-artifact@'))
     expect(download?.with?.pattern).toBe('release-${{ github.run_id }}-*')
-    const upload = config.jobs.build!.steps.find((step) =>
+    const artifact = config.jobs.build!.steps.find((step) =>
       step.uses?.startsWith('actions/upload-artifact@'),
     )
-    expect(upload?.with?.name).toBe('release-${{ github.run_id }}-${{ matrix.platform }}')
-    expect(upload?.with?.overwrite).toBe(true)
+    expect(artifact?.with?.name).toBe('release-${{ github.run_id }}-${{ matrix.platform }}')
+    expect(artifact?.with?.overwrite).toBe(true)
     expect(download?.with?.['run-id']).toBeUndefined()
     for (const current of Object.values(config.jobs)) {
       expect(

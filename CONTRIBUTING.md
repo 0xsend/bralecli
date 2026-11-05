@@ -116,7 +116,7 @@ Include a CLI version bump in `apps/cli/package.json` and an entry in
 share a version. Spec PRs propose these files automatically. Repository-only
 changes do not require a release.
 
-**Prepare Release** runs on maintainer pushes to `main`, including reviewed PR
+**Release** runs on maintainer pushes to `main`, including reviewed PR
 merges, and supports manual dispatch on `main`. An already completed version is a
 no-op. A pending version runs locked installs and project checks, then builds and
 smoke-tests each executable on its native macOS/Linux and ARM64/x64 runner. These
@@ -129,10 +129,19 @@ containing four archives, `SHA256SUMS` and `build-info.json`. It never executes
 downloaded binaries or installs dependencies. Failed uploads leave a draft;
 reruns resume matching assets and reject conflicts without replacing bytes.
 
-Review the draft's source revision, changelog and all four build/smoke results.
-Confirm all six assets are attached before publishing. Repository release
-immutability locks the assets and tag when the draft is published. Corrections
-ship under a new version. Automation never publishes a draft or approves/merges
+The same writer then publishes the draft, but only when it belongs to the exact
+source revision and its six assets match the verified files. Latest moves only when
+the version is above every published stable release, so a backport keeps the newer
+release as Latest. The job fails if the published tag or release immutability cannot
+be confirmed. Merging a version change publishes it, so review the version,
+changelog and compatibility results in the PR; to hold a release, leave the version
+change unmerged. Repository release immutability locks the assets and tag on
+publication, and corrections ship under a new version.
+
+If publication fails, rerun the failed jobs of that run: the writer reuses the same
+artifacts and matching draft. Later runs skip a complete draft and warn that it is
+unpublished. If its run can no longer be rerun, review its source revision,
+changelog and assets, then publish it by hand. Automation never approves or merges
 a PR. Existing mutable releases are not changed by this workflow.
 
 For local recovery, use a clean checkout of the exact intended source commit:
@@ -144,8 +153,11 @@ bun --no-env-file scripts/build-binaries.mjs /absolute/binaries
 nub scripts/release-artifacts.ts package /absolute/binaries darwin-arm64 /absolute/package-darwin-arm64
 # Repeat packaging for the other three platforms; collect their files in inputs.
 gh auth token | nub scripts/release-draft.ts upload /absolute/inputs /absolute/new-verified-output
+# Only after reviewing the draft:
+gh auth token | nub scripts/release-draft.ts publish /absolute/new-verified-output
 ```
 
 Packaging does not replace the required smoke tests. The upload command validates
-the inputs and leaves the release as a draft. Pass tokens only through stdin;
+the inputs and leaves the release as a draft. The publish command applies the same
+checks as the workflow before publishing it. Pass tokens only through stdin;
 never place them in command arguments or files.
