@@ -1,5 +1,13 @@
 # bralecli
 
+## 0.4.0
+
+### Minor Changes
+
+- **Breaking:** the generated CLI no longer includes operations that the Brale
+  OpenAPI document marks `deprecated: true`. The vendored contract currently
+  marks none, so no command changes until a refresh includes one.
+
 ## 0.3.0
 
 ### Minor Changes

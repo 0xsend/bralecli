@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { PATH_PARAMETER_VALUE_PATTERN, constrainPathParameters } from './normalize.js'
+import {
+  PATH_PARAMETER_VALUE_PATTERN,
+  constrainPathParameters,
+  omitDeprecatedOperations,
+  prepareSpecForCli,
+} from './normalize.js'
 import { spec } from './spec.js'
 
 describe('constrainPathParameters', () => {
@@ -132,6 +137,74 @@ describe('constrainPathParameters', () => {
       '',
     ])
       expect(pattern.test(bad)).toBe(false)
+  })
+})
+
+describe('omitDeprecatedOperations', () => {
+  const ok = { responses: { '200': { description: 'ok' } } }
+
+  it('removes only the deprecated operation and keeps its siblings and path parameters', () => {
+    const result = omitDeprecatedOperations({
+      paths: {
+        '/things/{id}': {
+          parameters: [{ name: 'id', in: 'path' }],
+          get: { operationId: 'get_thing', ...ok },
+          delete: { operationId: 'delete_thing', deprecated: true, ...ok },
+        },
+      },
+    })
+
+    const item = result.paths?.['/things/{id}']
+    expect(item?.get).toBeDefined()
+    expect(item?.delete).toBeUndefined()
+    expect(item?.parameters).toEqual([{ name: 'id', in: 'path' }])
+  })
+
+  it('removes a path item once every operation on it is deprecated', () => {
+    const result = omitDeprecatedOperations({
+      paths: {
+        '/old': { get: { deprecated: true, ...ok }, post: { deprecated: true, ...ok } },
+        '/current': { get: { ...ok } },
+      },
+    })
+
+    expect(Object.keys(result.paths ?? {})).toEqual(['/current'])
+  })
+
+  it('keeps operations that are not deprecated: true', () => {
+    const result = omitDeprecatedOperations({
+      paths: {
+        '/things': {
+          get: { deprecated: false, ...ok },
+          post: { ...ok },
+          put: { deprecated: 'true', ...ok },
+        },
+      },
+    })
+
+    expect(Object.keys(result.paths?.['/things'] ?? {})).toEqual(['get', 'post', 'put'])
+  })
+
+  it('keeps a path item that never had an operation', () => {
+    const result = omitDeprecatedOperations({
+      paths: { '/shared': { parameters: [{ name: 'id', in: 'path' }] } },
+    })
+
+    expect(result.paths?.['/shared']).toEqual({ parameters: [{ name: 'id', in: 'path' }] })
+  })
+
+  it('does not mutate its input', () => {
+    const input = { paths: { '/old': { get: { deprecated: true, ...ok } } } }
+    omitDeprecatedOperations(input)
+    expect(input.paths['/old'].get.deprecated).toBe(true)
+  })
+
+  it('is applied by prepareSpecForCli', () => {
+    const result = prepareSpecForCli({
+      paths: { '/old': { get: { deprecated: true, ...ok } }, '/current': { get: { ...ok } } },
+    })
+
+    expect(Object.keys(result.paths ?? {})).toEqual(['/current'])
   })
 })
 
