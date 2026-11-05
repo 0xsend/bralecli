@@ -1,4 +1,4 @@
-name: Prepare Release
+name: Release
 
 on:
   push:
@@ -38,6 +38,9 @@ jobs:
           printf '%s' "$GH_TOKEN" | node scripts/release-draft.ts inspect > "$RUNNER_TEMP/release-candidate.json"
           jq -r '"prepare=\(.prepare)\nversion=\(.version)"' "$RUNNER_TEMP/release-candidate.json" >> "$GITHUB_OUTPUT"
           cat "$RUNNER_TEMP/release-candidate.json" >> "$GITHUB_STEP_SUMMARY"
+          if jq -e '.prepare == false and .published == false' "$RUNNER_TEMP/release-candidate.json" > /dev/null; then
+            echo '::warning::A complete draft is still unpublished. Rerun the failed jobs of the run that built it, or review and publish it manually.'
+          fi
 
   build:
     name: Build and smoke (${{ matrix.platform }})
@@ -94,8 +97,8 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  draft:
-    name: Validate and prepare draft
+  publish:
+    name: Validate, draft and publish
     needs: [candidate, build]
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -121,4 +124,12 @@ jobs:
           set -euo pipefail
           printf '%s' "$GH_TOKEN" | node scripts/release-draft.ts upload "$RUNNER_TEMP/release-inputs" "$RUNNER_TEMP/verified-release" > "$RUNNER_TEMP/release-result.json"
           cat "$RUNNER_TEMP/release-result.json" >> "$GITHUB_STEP_SUMMARY"
-          echo 'Draft only. Review its source, changelog, checksums and all four assets before publishing. Publication locks assets under repository release immutability.' >> "$GITHUB_STEP_SUMMARY"
+      # Merging a reviewed version bump is the release decision. Publication is irreversible:
+      # immutability then locks the assets and tag, so corrections ship as a new version.
+      - name: Publish the verified draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$GH_TOKEN" | node scripts/release-draft.ts publish "$RUNNER_TEMP/verified-release" > "$RUNNER_TEMP/release-published.json"
+          cat "$RUNNER_TEMP/release-published.json" >> "$GITHUB_STEP_SUMMARY"

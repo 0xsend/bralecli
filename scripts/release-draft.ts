@@ -1,4 +1,7 @@
-/** Trusted, builtin-only GitHub adapter. Public publication is deliberately absent. */
+/**
+ * Trusted, builtin-only GitHub adapter. It drafts verified artifacts, then publishes only a
+ * complete draft holding exactly those bytes; publication is irreversible under immutability.
+ */
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { lstat, readFile, readdir } from 'node:fs/promises'
@@ -13,7 +16,7 @@ const fileNames = [
   'SHA256SUMS',
 ]
 type Api = (
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'PATCH',
   path: string,
   body?: Buffer | Record<string, unknown>,
   upload?: boolean,
@@ -23,6 +26,8 @@ type Release = {
   id: number
   tag_name: string
   draft: boolean
+  prerelease: boolean
+  immutable?: boolean
   target_commitish: string
   html_url: string
   assets: Asset[]
@@ -91,6 +96,8 @@ function parseRelease(value: unknown): Release {
     Number(value.id) <= 0 ||
     typeof value.tag_name !== 'string' ||
     typeof value.draft !== 'boolean' ||
+    typeof value.prerelease !== 'boolean' ||
+    (value.immutable !== undefined && typeof value.immutable !== 'boolean') ||
     typeof value.target_commitish !== 'string' ||
     typeof value.html_url !== 'string' ||
     !Array.isArray(value.assets) ||
@@ -112,25 +119,56 @@ function parseRelease(value: unknown): Release {
   return value as unknown as Release
 }
 
-async function findRelease(api: Api, version: string): Promise<Release | undefined> {
-  if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('Expected a stable release version')
-  // Tag lookup omits drafts. List authenticated releases, with a fail-closed cap.
+// Tag lookup omits drafts. List authenticated releases, with a fail-closed cap.
+async function listReleases(api: Api): Promise<unknown[]> {
+  const releases: unknown[] = []
   for (let page = 1; page <= 20; page++) {
     const result = await api('GET', `${releasePath}?per_page=100&page=${page}`)
     if (!Array.isArray(result)) throw new Error('Expected GitHub release list')
-    const matching = result.filter((value) => object(value) && value.tag_name === `v${version}`)
-    if (matching.length > 1) throw new Error('Multiple releases share the requested version')
-    if (matching.length) return parseRelease(matching[0])
-    if (result.length < 100) return undefined
+    releases.push(...result)
+    if (result.length < 100) return releases
   }
   throw new Error('Release search exceeds 2,000 releases')
 }
 
-async function verifyTag(api: Api, version: string, revision: string): Promise<void> {
+async function findRelease(api: Api, version: string): Promise<Release | undefined> {
+  if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('Expected a stable release version')
+  const matching = (await listReleases(api)).filter(
+    (value) => object(value) && value.tag_name === `v${version}`,
+  )
+  if (matching.length > 1) throw new Error('Multiple releases share the requested version')
+  return matching.length ? parseRelease(matching[0]) : undefined
+}
+
+function stableVersion(tag: unknown): number[] | undefined {
+  const match = typeof tag === 'string' ? /^v(\d+)\.(\d+)\.(\d+)$/.exec(tag) : null
+  return match ? match.slice(1).map(Number) : undefined
+}
+
+/** Latest moves only to a version above every published stable release, not to a backport. */
+async function isNewest(api: Api, version: string): Promise<boolean> {
+  const own = stableVersion(`v${version}`)!
+  return (await listReleases(api)).every((value) => {
+    if (!object(value) || value.draft !== false || value.prerelease !== false) return true
+    const other = stableVersion(value.tag_name)
+    const difference = other && own.map((part, index) => part - other[index]!).find(Boolean)
+    return !other || (difference ?? 0) > 0
+  })
+}
+
+async function verifyTag(
+  api: Api,
+  version: string,
+  revision: string,
+  required = false,
+): Promise<void> {
   let tag = await api('GET', `/repos/${repository}/git/ref/tags/v${version}`)
   // GitHub creates an absent tag only when a draft is published. Existing tags
   // override target_commitish, so resolve them independently of release metadata.
-  if (tag === undefined) return
+  if (tag === undefined) {
+    if (required) throw new Error('Published release has no version tag')
+    return
+  }
   for (let depth = 0; depth < 8; depth++) {
     if (
       !object(tag) ||
@@ -153,9 +191,9 @@ async function verifyTag(api: Api, version: string, revision: string): Promise<v
 export async function inspectRelease(
   api: Api,
   version: string,
-): Promise<{ prepare: boolean; url?: string }> {
+): Promise<{ prepare: boolean; published: boolean; url?: string }> {
   const release = await findRelease(api, version)
-  if (!release) return { prepare: true }
+  if (!release) return { prepare: true, published: false }
   const complete =
     release.assets.length === fileNames.length &&
     fileNames.every((name) =>
@@ -166,7 +204,7 @@ export async function inspectRelease(
           /^sha256:[a-f0-9]{64}$/.test(asset.digest),
       ),
     )
-  return { prepare: release.draft && !complete, url: release.html_url }
+  return { prepare: release.draft && !complete, published: !release.draft, url: release.html_url }
 }
 
 async function localUploads(directory: string): Promise<Upload[]> {
@@ -254,16 +292,50 @@ export async function uploadDraft(
   return { url: verified.html_url, draft: true, assets: verified.assets.length }
 }
 
+export async function publishRelease(
+  api: Api,
+  input: { version: string; revision: string; directory: string },
+): Promise<{ url: string; draft: false; latest: boolean }> {
+  if (!/^[a-f0-9]{40}$/.test(input.revision)) throw new Error('Expected an exact source commit')
+  const uploads = await localUploads(input.directory)
+  const release = await findRelease(api, input.version)
+  // Publication cannot be undone, so the draft must hold exactly the verified bytes.
+  if (
+    !release?.draft ||
+    release.target_commitish !== input.revision ||
+    reconcile(release, uploads).length
+  )
+    throw new Error('Only a complete draft of the verified source revision can be published')
+  await verifyTag(api, input.version, input.revision)
+  const latest = await isNewest(api, input.version)
+  await api('PATCH', `${releasePath}/${release.id}`, {
+    draft: false,
+    make_latest: String(latest),
+  })
+  const published = parseRelease(await api('GET', `${releasePath}/${release.id}`))
+  if (
+    published.draft ||
+    published.target_commitish !== input.revision ||
+    reconcile(published, uploads).length
+  )
+    throw new Error('Release verification failed after publishing')
+  await verifyTag(api, input.version, input.revision, true)
+  if (published.immutable !== true)
+    throw new Error('Published release is not immutable; check repository release immutability')
+  return { url: published.html_url, draft: false, latest }
+}
+
 async function main(): Promise<void> {
   const [command, inputDirectory, outputDirectory, ...extra] = process.argv.slice(2)
   if (
     extra.length ||
-    !['inspect', 'upload'].includes(command ?? '') ||
+    !['inspect', 'upload', 'publish'].includes(command ?? '') ||
     (command === 'inspect' && inputDirectory !== undefined) ||
-    (command === 'upload' && (!inputDirectory || !outputDirectory))
+    (command === 'upload' && (!inputDirectory || !outputDirectory)) ||
+    (command === 'publish' && (!inputDirectory || outputDirectory !== undefined))
   )
     throw new Error(
-      'Usage: release-draft.ts inspect | upload <artifacts-dir> <new-verified-dir> (GitHub token on stdin)',
+      'Usage: release-draft.ts inspect | upload <artifacts-dir> <new-verified-dir> | publish <verified-dir> (GitHub token on stdin)',
     )
   const tokenChunks: Buffer[] = []
   let tokenSize = 0
@@ -283,6 +355,11 @@ async function main(): Promise<void> {
   }).trim()
   if (command === 'inspect') {
     console.log(JSON.stringify({ version, revision, ...(await inspectRelease(api, version)) }))
+    return
+  }
+  if (command === 'publish') {
+    const directory = inputDirectory!
+    console.log(JSON.stringify(await publishRelease(api, { version, revision, directory })))
     return
   }
   const { verifyArtifacts } = await import('./release-artifacts.ts')

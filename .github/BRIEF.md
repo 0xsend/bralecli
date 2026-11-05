@@ -27,9 +27,9 @@ verify the changes and repository protections from concrete evidence.
   annotations. All four native jobs pass project checks and the standalone smoke
   harness. Artifact tests reject wrong identity, digest, file type, archive paths
   and incomplete platform sets before the writer can upload.
-- Release recovery: HTTP integration tests prove draft-only creation, exact asset
+- Release recovery: HTTP integration tests prove draft creation, exact asset
   verification, resumption of matching uploads, conflict rejection and preservation
-  of published releases. Published releases are never an automation output.
+  of published releases. Only a complete draft matching the verified files is published.
 
 ## Oracle
 
@@ -71,3 +71,7 @@ reviewed versions produce four-platform verified draft releases. Public
 publication of v0.2.0 is authorized; future drafts require a maintainer to publish.
 Release builds use fresh native hosted VMs with read-only repository tokens;
 the separate draft writer never installs dependencies or executes artifacts.
+
+2026-11-05, ratified by request: verified drafts now publish automatically, which
+supersedes manual publication; merging the reviewed version change is the release
+decision. The writer publishes only a complete draft matching its verified files.
