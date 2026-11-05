@@ -47,8 +47,10 @@ Never give contributor code a write token or bypass required review to land it.
 Human and agent-assisted contributions are welcome. The requested team-only CI
 policy uses the existing Maintain/Admin roles; repository visibility stays private.
 Activating authorization and branch rules requires the plan approval specified in
-the operator's AGENTS.md. Merging a protected PR still requires an independent
-human approval; the author cannot approve it.
+the operator's AGENTS.md. Merging a protected PR requires an independent human
+approval, except that `@0xsend/bralecli-admins` members may merge their own PRs
+through a pull-request-only review bypass (2026-11-05, ratified by request). CI
+checks bind everyone, and the author can never approve their own PR.
 
 2026-09-08, ratified by request: daily spec checking and bot PR creation are
 authorized. The bot has no approval or merge step. Provisional implementation

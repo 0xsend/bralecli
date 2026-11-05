@@ -21,12 +21,15 @@ updating the default branch.
   contents write permission. Neither writer installs dependencies
   or execute project checks or the refreshed spec. Its builtin-only validator
   runs from the trusted main revision selected when the workflow started.
-- REQ-REPO-004: The default branch requires a PR, one code-owner approval from
-  someone other than the latest pusher, dismissal of stale approvals, resolved
-  review threads, and all seven CI checks on up-to-date code. No bypass actors,
-  force pushes, or branch deletion are allowed. The visible `@0xsend/bralecli-admins`
-  team, which has write access, owns every path; any one member's approval satisfies
-  code-owner review.
+- REQ-REPO-004: Two rulesets protect the default branch. The first requires all
+  seven CI checks on up-to-date code and blocks force pushes and branch deletion,
+  with no bypass actors. The second requires a PR, one code-owner approval from
+  someone other than the latest pusher, dismissal of stale approvals, extra approval
+  for unattributed changes, and resolved review threads. Only `@0xsend/bralecli-admins`
+  members may bypass it, and only when merging a PR, so an admin can merge their own
+  PR without a second approval; GitHub never lets authors approve their own PRs. The
+  visible `@0xsend/bralecli-admins` team, which has write access, owns every path; any
+  one member's approval satisfies code-owner review.
 - REQ-REPO-005: Dependency updates are manually requested on main and produce a
   downloadable patch. Dependency automation does not push commits or create PRs.
   No automation approves or merges PRs. Before verification, the run summary
@@ -115,8 +118,10 @@ REQ-REPO-009; maintainers review its main-branch inputs before running it.
 - [ ] REQ-REPO-001: YAML parsing and independent template review pass.
 - [ ] REQ-REPO-002: Active Actions policy shows the two roles and four events.
 - [ ] REQ-REPO-003/005: `nub run test` includes the repository policy tests; actionlint passes.
-- [ ] REQ-REPO-004: Live ruleset matches `.github/rules/main.json` with no bypass actors;
-      GitHub reports no CODEOWNERS errors for the default branch.
+- [ ] REQ-REPO-004: Live rulesets match `.github/rules/main.json` and
+      `.github/rules/main-review.json`; only the review ruleset has a bypass actor, the
+      admin team in pull-request mode. GitHub reports no CODEOWNERS errors for the
+      default branch.
 - [ ] REQ-REPO-003/004: All seven required CI checks appear on the current PR
       revision and pass; token defaults are read-only.
 - [ ] REQ-REPO-006/007: Refresh integration tests cover changed/unchanged bytes,
@@ -149,6 +154,14 @@ REQ-REPO-009; maintainers review its main-branch inputs before running it.
 
 ## Decisions
 
+- 2026-11-05, ratified by request: `@0xsend/bralecli-admins` members may merge their
+  own PRs without a second approval, through a pull-request-only bypass of a separate
+  review ruleset. CI checks, force-push and deletion rules keep no bypass, so this
+  replaces an undocumented personal bypass that also skipped CI. The live
+  `require_extra_approval_for_unattributed_changes` setting is now recorded.
+  Contributor and bot PRs still get an approving review before an admin merges them.
+  With automatic publication, an admin's own version change can release without a
+  second review.
 - 2026-11-05, ratified by request: releases publish automatically once the writer
   has verified the complete draft. This supersedes the 2026-09-09 decision that public
   releases are manual. Native builds, smoke tests and artifact validation already
