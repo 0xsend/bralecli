@@ -35,6 +35,20 @@ function workflow(name: string): Workflow {
   ) as Workflow
 }
 
+type Ruleset = {
+  target: string
+  enforcement: string
+  bypass_actors: unknown[]
+  conditions: unknown
+  rules: { type: string; parameters?: Record<string, unknown> }[]
+}
+
+function ruleset(name: string): Ruleset {
+  return JSON.parse(
+    readFileSync(new URL(`../.github/rules/${name}.json`, import.meta.url), 'utf8'),
+  ) as Ruleset
+}
+
 describe('repository automation trust boundaries', () => {
   const names = readdirSync(new URL('../.github/workflows/', import.meta.url))
     .filter((name) => name.endsWith('.yml'))
@@ -76,6 +90,48 @@ describe('repository automation trust boundaries', () => {
       .map((line) => line.trim())
       .filter((line) => line && !line.startsWith('#'))
     expect(rules).toEqual(['* @0xsend/bralecli-admins'])
+  })
+
+  it('only the admin team may skip review, only when merging a PR; CI checks bind everyone', () => {
+    const [branch, review] = [ruleset('main'), ruleset('main-review')]
+    for (const current of [branch, review]) {
+      expect(current.target).toBe('branch')
+      expect(current.enforcement).toBe('active')
+      expect(current.conditions).toEqual({
+        ref_name: { include: ['~DEFAULT_BRANCH'], exclude: [] },
+      })
+    }
+    expect(branch.bypass_actors).toEqual([])
+    expect(branch.rules.map((rule) => rule.type)).toEqual([
+      'deletion',
+      'non_fast_forward',
+      'required_status_checks',
+    ])
+    const raw = parse(readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8'))
+    const checks = branch.rules[2]!.parameters!.required_status_checks as { context: string }[]
+    expect(checks.map((check) => check.context).toSorted()).toEqual(
+      Object.values(raw.jobs as Record<string, { name: string }>)
+        .map((job) => job.name)
+        .toSorted(),
+    )
+    expect(branch.rules[2]!.parameters!.strict_required_status_checks_policy).toBe(true)
+    // 20505213 is @0xsend/bralecli-admins. GitHub never lets authors approve their own PRs,
+    // so this bypass is how an admin merges their own PR without a second approval.
+    expect(review.bypass_actors).toEqual([
+      { actor_id: 20505213, actor_type: 'Team', bypass_mode: 'pull_request' },
+    ])
+    expect(review.rules).toEqual([
+      {
+        type: 'pull_request',
+        parameters: expect.objectContaining({
+          required_approving_review_count: 1,
+          dismiss_stale_reviews_on_push: true,
+          require_code_owner_review: true,
+          require_last_push_approval: true,
+          required_review_thread_resolution: true,
+        }),
+      },
+    ])
   })
 
   it('CI accepts only push, pull request, and manual triggers', () => {

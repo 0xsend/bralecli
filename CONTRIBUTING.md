@@ -41,6 +41,13 @@ The default branch requires a code-owner review and passing checks. Updates afte
 review may require another approval. Agent-generated changes follow the same
 review process as any other contribution.
 
+GitHub never lets authors approve their own PRs. Instead, `@0xsend/bralecli-admins`
+members can merge their own PR without a second approval: once all seven checks
+pass, select **Merge without waiting for requirements to be met (bypass rules)**.
+The bypass covers only the review rules; failing or pending checks still block the
+merge, and direct pushes to `main` remain blocked. Approve contributor and bot PRs
+normally rather than bypassing their review.
+
 CI runs project checks in disposable Docker containers. Dependency installation
 skips lifecycle scripts in a separate container; checks run without outbound
 networking, runner credentials, or host mounts. Local HTTP fixtures still work.
