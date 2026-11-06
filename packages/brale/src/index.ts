@@ -3,6 +3,7 @@ export {
   PATH_PARAMETER_VALUE_PATTERN,
   constrainPathParameters,
   flattenObjectQueryParameters,
+  omitDeprecatedOperations,
   prepareSpecForCli,
   restoreObjectQueryParameters,
 } from './normalize.js'

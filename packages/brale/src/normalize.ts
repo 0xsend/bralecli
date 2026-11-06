@@ -207,9 +207,33 @@ export function flattenObjectQueryParameters<document extends Document>(
   return source
 }
 
+/**
+ * Returns a copy of `document` without operations that declare `deprecated: true`,
+ * so the generated CLI offers no command for them. A path item left with no
+ * operation is removed with them; one that never had an operation is kept as is.
+ * Only the boolean `true` omits an operation. The input is not mutated.
+ */
+export function omitDeprecatedOperations<document extends Document>(document: document): document {
+  const source = structuredClone(document)
+
+  for (const [path, pathItem] of Object.entries(source.paths ?? {})) {
+    let removed = false
+    for (const method of HTTP_METHODS) {
+      const operation = pathItem[method]
+      if (!operation || typeof operation !== 'object') continue
+      if ((operation as { deprecated?: unknown }).deprecated !== true) continue
+      delete pathItem[method]
+      removed = true
+    }
+    if (removed && !HTTP_METHODS.some((method) => pathItem[method])) delete source.paths?.[path]
+  }
+
+  return source
+}
+
 /** The vendored contract normalized for incur's generated CLI surface. */
 export function prepareSpecForCli<document extends Document>(document: document): document {
-  return flattenObjectQueryParameters(constrainPathParameters(document))
+  return flattenObjectQueryParameters(constrainPathParameters(omitDeprecatedOperations(document)))
 }
 
 function pathMatches(templatePath: string, pathname: string): boolean {

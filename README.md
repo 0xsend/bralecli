@@ -7,6 +7,8 @@ stablecoins from your terminal.
 Commands are generated from the vendored Brale OpenAPI
 document. Command names match its `operationId` values, so you can move between
 the API contract and the CLI without learning a separate set of resource commands.
+Operations the document marks `deprecated: true` are not generated, so a retired
+operation has no command.
 
 ## Install
 
