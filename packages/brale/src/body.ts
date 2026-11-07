@@ -10,6 +10,7 @@
  * top-level properties are JSON containers, and re-parses only those.
  */
 
+import { findOperation } from './operations.js'
 import {
   REFERENCE_DEPTH_LIMIT,
   resolveReference,
@@ -76,18 +77,6 @@ function isJsonContainer(document: DocumentLike, input: SchemaLike, depth: numbe
   return false
 }
 
-/** Templated spec paths match a concrete pathname segment-for-segment. */
-function pathMatches(templatePath: string, pathname: string): boolean {
-  const templateSegments = templatePath.split('/')
-  const pathSegments = pathname.split('/')
-  if (templateSegments.length !== pathSegments.length) return false
-  return templateSegments.every(
-    (segment, index) =>
-      (segment.startsWith('{') && segment.endsWith('}') && pathSegments[index] !== '') ||
-      segment === pathSegments[index],
-  )
-}
-
 /**
  * The top-level request-body properties the contract declares as JSON
  * containers for this operation, or an empty set when the operation is unknown
@@ -98,22 +87,12 @@ export function jsonContainerBodyProperties(
   document: DocumentLike,
   options: { method: string; pathname: string },
 ): Set<string> {
-  const method = options.method.toLowerCase()
   const containers = new Set<string>()
 
-  let matched: Record<string, unknown> | undefined
-  let matchedTemplateCount = Number.POSITIVE_INFINITY
-  for (const [templatePath, item] of Object.entries(document.paths ?? {})) {
-    if (!item[method] || !pathMatches(templatePath, options.pathname)) continue
-    const templateCount = templatePath.match(/\{/g)?.length ?? 0
-    if (templateCount < matchedTemplateCount) {
-      matched = item
-      matchedTemplateCount = templateCount
-    }
-  }
+  const matched = findOperation(document, options)
   if (!matched) return containers
 
-  const operation = matched[method] as {
+  const operation = matched.operation as {
     requestBody?: { content?: Record<string, { schema?: SchemaLike }> }
   }
   const bodySchema = operation.requestBody?.content?.['application/json']?.schema
