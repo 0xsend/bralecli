@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { resetAuthCacheForTesting } from './client.js'
@@ -81,6 +83,20 @@ describe('argv that names no command', () => {
     expect(code).toBe(1)
     expect(output).toContain('UNKNOWN_OPERATION')
     expect(output).not.toContain('000123456789')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('reports its version from a source checkout without contacting Brale', async () => {
+    // The skill's first discovery step. Release binaries embed the version; a
+    // checkout has none, so `--version` used to reach Brale as `GET /`.
+    const { version } = JSON.parse(
+      readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+    ) as { version: string }
+
+    const { code, output } = await run(['--version'])
+
+    expect(code).toBe(0)
+    expect(output.trim()).toBe(version)
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })
