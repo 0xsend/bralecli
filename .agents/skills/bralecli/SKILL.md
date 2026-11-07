@@ -24,6 +24,10 @@ needed. Discovery does not call Brale. There is no dry-run mode for API writes;
 `--help` and `--schema` describe syntax, not permissions, available funds, or
 whether a transfer will succeed.
 
+A name the installed CLI does not have fails with `UNKNOWN_OPERATION` and sends
+nothing to Brale. Find the current name with `bralecli --llms` instead of
+guessing; a spec refresh can remove a command Brale deprecated.
+
 ## Credentials and target
 
 Use credentials already configured by the operator. For 1Password, the CLI

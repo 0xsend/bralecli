@@ -3,6 +3,7 @@ export {
   PATH_PARAMETER_VALUE_PATTERN,
   constrainPathParameters,
   flattenObjectQueryParameters,
+  isContractRequest,
   prepareSpecForCli,
   restoreObjectQueryParameters,
 } from './normalize.js'
@@ -16,3 +17,4 @@ export {
   spec,
   type OpenApiDocument,
 } from './spec.js'
+export type { DocumentLike } from './references.js'

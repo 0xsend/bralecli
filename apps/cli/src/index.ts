@@ -18,6 +18,11 @@
  * programmatic object as `[object Object]`; the client restores Brale's
  * bracketed deep-object names immediately before sending the request.
  *
+ * The fetch source receives the same prepared contract and refuses any request
+ * that no generated command could have built. incur routes argv naming no
+ * command to it as a raw path, and that must fail locally rather than reach
+ * Brale with a token and the caller's values in the query string.
+ *
  * `security: false` because the token is injected as a per-request header,
  * never taken from argv. incur today synthesizes no flag for an `oauth2`
  * scheme, but this is declared intent, not an optimization: if a future incur
@@ -30,9 +35,11 @@ import { Cli } from 'incur'
 import { agents } from './agent-skills.js'
 import { braleFetchSource } from './client.js'
 
+const contract = prepareSpecForCli(spec)
+
 export const cli = Cli.create('bralecli', {
   description: 'CLI for the Brale API',
-  fetch: braleFetchSource(),
-  openapi: prepareSpecForCli(spec),
+  fetch: braleFetchSource(contract),
+  openapi: contract,
   openapiConfig: { security: false },
 }).command(agents)

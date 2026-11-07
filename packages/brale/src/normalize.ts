@@ -214,6 +214,32 @@ export function prepareSpecForCli<document extends Document>(document: document)
 }
 
 /**
+ * Whether a request addresses an operation the document declares, with every
+ * templated segment, once decoded, a value `PATH_PARAMETER_VALUE_PATTERN`
+ * admits. Generated commands build only such requests, so one that fails
+ * reached the fetch source some other way.
+ */
+export function isContractRequest(
+  document: DocumentLike,
+  options: { method: string; pathname: string },
+): boolean {
+  const matched = findOperation(document, options)
+  if (!matched) return false
+
+  const values = new RegExp(PATH_PARAMETER_VALUE_PATTERN)
+  const templateSegments = matched.templatePath.split('/')
+  return options.pathname.split('/').every((segment, index) => {
+    if (!templateSegments[index]?.startsWith('{')) return true
+    try {
+      return values.test(decodeURIComponent(segment))
+    } catch {
+      // A malformed escape is no value a generated command encodes.
+      return false
+    }
+  })
+}
+
+/**
  * Restores scalar CLI query names to Brale's documented deep-object wire form.
  * Returns whether any parameter changed.
  */
