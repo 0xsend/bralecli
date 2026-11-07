@@ -168,7 +168,6 @@ bralecli --help
 bralecli list_accounts
 bralecli get_account <account-id>
 bralecli list_account_addresses <account-id>
-bralecli list_account_financial_institutions <account-id>
 bralecli create_transfer --help
 ```
 

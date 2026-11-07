@@ -14,8 +14,11 @@ import {
   BRALE_TOKEN_PATH,
   BodyValueError,
   coerceJsonBodyText,
+  isContractRequest,
+  prepareSpecForCli,
   restoreObjectQueryParameters,
   spec,
+  type DocumentLike,
 } from '@bralecli/brale'
 import { Errors, Fetch } from 'incur'
 
@@ -204,6 +207,24 @@ function withRestoredQuery(request: Request): Request {
 }
 
 /**
+ * incur hands argv that names no command to this source as a raw request: the
+ * words become the path and curl-style flags become query parameters. Without
+ * this, a retired or misspelled command mints a token and sends
+ * `GET /retired_command/<id>?account_number=...` to Brale, carrying whatever
+ * values were typed. Only a request a generated command could have built may
+ * leave the process, and the check runs before credentials are resolved. The
+ * message names the path but not the query, which can hold those values.
+ */
+function assertContractRequest(contract: DocumentLike, request: Request): void {
+  const { pathname } = new URL(request.url)
+  if (isContractRequest(contract, { method: request.method, pathname })) return
+  throw new Errors.IncurError({
+    code: 'UNKNOWN_OPERATION',
+    message: `No bralecli command sends ${request.method} ${pathname}, so nothing was sent to Brale. Run \`bralecli --help\` to list commands.`,
+  })
+}
+
+/**
  * A fetch source for the generated commands: incur's own
  * `Fetch.fromRequest`, with a Bearer token minted lazily per expiry window and
  * generated bodies repaired against the spec.
@@ -212,8 +233,13 @@ function withRestoredQuery(request: Request): Request {
  * is vendored — so a malformed ${API_BASE_URL_ENV} falls back to the default
  * here rather than crashing `--help` at import; the named error surfaces from
  * `fetch`, on the first command that actually needs the value.
+ *
+ * `contract` must be the document the commands were generated from, so the
+ * operations this source will send are exactly the commands the CLI offers.
  */
-export function braleFetchSource(): Fetch.RequestSource {
+export function braleFetchSource(
+  contract: DocumentLike = prepareSpecForCli(spec),
+): Fetch.RequestSource {
   let registrationUrl: URL
   try {
     registrationUrl = new URL(apiBaseUrl())
@@ -224,6 +250,7 @@ export function braleFetchSource(): Fetch.RequestSource {
   return {
     url: registrationUrl,
     async fetch(request: Request): Promise<Response> {
+      assertContractRequest(contract, request)
       const target = validatedUrl(apiBaseUrl(), API_BASE_URL_ENV, BRALE_API_BASE_URL)
       const source = Fetch.fromRequest(target, {
         headers: { Authorization: `Bearer ${await accessToken()}` },

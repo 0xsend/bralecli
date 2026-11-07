@@ -8,6 +8,7 @@
  * request at a different resource. Constraining the parameter schemas turns
  * that into a validation error before any request is built.
  */
+import { findOperation } from './operations.js'
 import { resolveReference, type DocumentLike } from './references.js'
 
 type ParameterLike = {
@@ -212,15 +213,30 @@ export function prepareSpecForCli<document extends Document>(document: document)
   return flattenObjectQueryParameters(constrainPathParameters(document))
 }
 
-function pathMatches(templatePath: string, pathname: string): boolean {
-  const templateSegments = templatePath.split('/')
-  const pathSegments = pathname.split('/')
-  if (templateSegments.length !== pathSegments.length) return false
-  return templateSegments.every(
-    (segment, index) =>
-      (segment.startsWith('{') && segment.endsWith('}') && pathSegments[index] !== '') ||
-      segment === pathSegments[index],
-  )
+/**
+ * Whether a request addresses an operation the document declares, with every
+ * templated segment, once decoded, a value `PATH_PARAMETER_VALUE_PATTERN`
+ * admits. Generated commands build only such requests, so one that fails
+ * reached the fetch source some other way.
+ */
+export function isContractRequest(
+  document: DocumentLike,
+  options: { method: string; pathname: string },
+): boolean {
+  const matched = findOperation(document, options)
+  if (!matched) return false
+
+  const values = new RegExp(PATH_PARAMETER_VALUE_PATTERN)
+  const templateSegments = matched.templatePath.split('/')
+  return options.pathname.split('/').every((segment, index) => {
+    if (!templateSegments[index]?.startsWith('{')) return true
+    try {
+      return values.test(decodeURIComponent(segment))
+    } catch {
+      // A malformed escape is no value a generated command encodes.
+      return false
+    }
+  })
 }
 
 /**
@@ -231,21 +247,12 @@ export function restoreObjectQueryParameters(
   document: Document,
   options: { method: string; pathname: string; searchParams: URLSearchParams },
 ): boolean {
-  const method = options.method.toLowerCase()
-  let matched: PathItem | undefined
-  let matchedTemplateCount = Number.POSITIVE_INFINITY
-  for (const [templatePath, pathItem] of Object.entries(document.paths ?? {})) {
-    if (!pathMatches(templatePath, options.pathname) || !pathItem[method]) continue
-    const templateCount = templatePath.match(/\{/g)?.length ?? 0
-    if (templateCount < matchedTemplateCount) {
-      matched = pathItem
-      matchedTemplateCount = templateCount
-    }
-  }
+  const matched = findOperation(document as DocumentLike, options)
   if (!matched) return false
 
-  const operation = matched[method] as { parameters?: ParameterLike[] }
-  const parameters = [...(matched.parameters ?? []), ...(operation.parameters ?? [])]
+  const pathItem = matched.pathItem as PathItem
+  const operation = matched.operation as { parameters?: ParameterLike[] }
+  const parameters = [...(pathItem.parameters ?? []), ...(operation.parameters ?? [])]
   let changed = false
   for (const parameter of parameters) {
     const properties = objectQueryProperties(document, parameter)

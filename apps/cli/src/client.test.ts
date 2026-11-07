@@ -71,7 +71,7 @@ describe('braleFetchSource', () => {
   it('reuses an unexpired token instead of minting per request', async () => {
     const source = braleFetchSource()
     await source.fetch(generatedRequest({ path: '/accounts' }))
-    await source.fetch(generatedRequest({ path: '/transfer-types' }))
+    await source.fetch(generatedRequest({ path: '/accounts/acct-1' }))
 
     expect(tokenCalls()).toHaveLength(1)
     expect(apiCalls()).toHaveLength(2)
@@ -81,10 +81,58 @@ describe('braleFetchSource', () => {
     const source = braleFetchSource()
     await Promise.all([
       source.fetch(generatedRequest({ path: '/accounts' })),
-      source.fetch(generatedRequest({ path: '/transfer-types' })),
+      source.fetch(generatedRequest({ path: '/accounts/acct-1' })),
     ])
 
     expect(tokenCalls()).toHaveLength(1)
+  })
+
+  // incur treats argv that names no command as a raw request path, and its
+  // curl-style flags as query parameters. A retired or misspelled command must
+  // fail here, before a token is minted, rather than reach Brale as
+  // `GET /retired_command/<id>?account_number=...` with the caller's values.
+  it('refuses a request no command sends before resolving credentials', async () => {
+    vi.stubEnv('BRALE_CLIENT_ID', undefined)
+    vi.stubEnv('BRALE_CLIENT_SECRET', undefined)
+
+    const error = (await Promise.resolve(
+      braleFetchSource().fetch(
+        generatedRequest({ path: '/retired_command/acct-1?account_number=000123456789' }),
+      ),
+    ).catch((caught: unknown) => caught)) as { code?: string; message: string }
+
+    expect(error.code).toBe('UNKNOWN_OPERATION')
+    expect(error.message).toContain('GET /retired_command/acct-1')
+    expect(error.message).toContain('bralecli --help')
+    expect(error.message).not.toContain('000123456789')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['the root path', 'GET', '/'],
+    ['a method the path does not declare', 'DELETE', '/accounts'],
+    ['an encoded separator inside a path parameter', 'GET', '/accounts/acct-1%2F..%2Fother'],
+    ['a malformed percent escape', 'GET', '/accounts/acct-1%E0'],
+  ])('refuses %s', async (_case, method, path) => {
+    const error = (await Promise.resolve(
+      braleFetchSource().fetch(generatedRequest({ path, method })),
+    ).catch((caught: unknown) => caught)) as { code?: string }
+
+    expect(error.code).toBe('UNKNOWN_OPERATION')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('refuses an operation missing from the contract it serves', async () => {
+    // index.ts hands the generator and this source one prepared contract, so an
+    // operation the CLI leaves out has no raw-path route to Brale either.
+    const contract = { paths: { '/accounts': { post: { operationId: 'create_account' } } } }
+
+    const error = (await Promise.resolve(
+      braleFetchSource(contract).fetch(generatedRequest({ path: '/accounts' })),
+    ).catch((caught: unknown) => caught)) as { code?: string }
+
+    expect(error.code).toBe('UNKNOWN_OPERATION')
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('does not reuse a token whose remaining lifetime is inside the safety margin', async () => {

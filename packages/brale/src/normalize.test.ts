@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { PATH_PARAMETER_VALUE_PATTERN, constrainPathParameters } from './normalize.js'
+import {
+  PATH_PARAMETER_VALUE_PATTERN,
+  constrainPathParameters,
+  isContractRequest,
+  prepareSpecForCli,
+} from './normalize.js'
 import { spec } from './spec.js'
 
 describe('constrainPathParameters', () => {
@@ -163,5 +168,39 @@ describe('the vendored Brale document, constrained', () => {
     }
 
     expect(unconstrained).toEqual([])
+  })
+})
+
+describe('isContractRequest', () => {
+  const contract = prepareSpecForCli(spec)
+  const KSUID = '2VZvtmVc2j3gQ80CTlcuQXbGrwC'
+  const METHODS = ['get', 'put', 'post', 'delete', 'patch'] as const
+
+  it('admits every operation in the vendored document with real id values', () => {
+    // The guard in front of every request: a false rejection here is a command
+    // that can no longer reach Brale at all.
+    const refused: string[] = []
+    for (const [templatePath, pathItem] of Object.entries(contract.paths)) {
+      for (const method of METHODS) {
+        if (!pathItem[method]) continue
+        const pathname = templatePath.replace(/\{[^}]+\}/g, KSUID)
+        if (!isContractRequest(contract, { method: method.toUpperCase(), pathname }))
+          refused.push(`${method.toUpperCase()} ${templatePath}`)
+      }
+    }
+    expect(refused).toEqual([])
+  })
+
+  it.each([
+    ['a path the document does not declare', 'GET', `/retired_command/${KSUID}`],
+    ['the root path', 'GET', '/'],
+    ['a method the path does not declare', 'DELETE', '/accounts'],
+    ['an empty parameter segment', 'GET', '/accounts/'],
+    ['an encoded slash inside a parameter', 'GET', `/accounts/${KSUID}%2F..%2Fother`],
+    ['an encoded backslash inside a parameter', 'GET', `/accounts/${KSUID}%5Cother`],
+    ['a double-encoded escape inside a parameter', 'GET', `/accounts/${KSUID}%252e`],
+    ['a malformed escape inside a parameter', 'GET', `/accounts/${KSUID}%E0`],
+  ])('refuses %s', (_case, method, pathname) => {
+    expect(isContractRequest(contract, { method, pathname })).toBe(false)
   })
 })
