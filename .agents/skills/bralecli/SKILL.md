@@ -58,7 +58,6 @@ returns the same `data` wrapper; inspect the actual response.
 bralecli list_accounts --page_size 50 --format json
 bralecli get_account <account-id> --format json
 bralecli list_account_addresses <account-id> --format json
-bralecli list_account_financial_institutions <account-id> --format json
 bralecli list_transfers <account-id> --page_size 50 --format json
 bralecli list_transfers <account-id> --page_size 50 --page_after <cursor> --format json
 bralecli get_transfer <account-id> <transfer-id> --format json
