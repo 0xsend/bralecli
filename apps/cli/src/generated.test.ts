@@ -107,4 +107,20 @@ describe('commands generated from the Brale document', () => {
       expect(options, name).not.toContain('authorization')
     }
   })
+
+  it('generates no command for an operation the document marks deprecated', async () => {
+    // Brale marks retired operations `deprecated: true`. Only the flagged
+    // operation may disappear; its siblings on the same path must remain.
+    const document = structuredClone(spec) as typeof spec & {
+      paths: Record<string, Record<string, { deprecated?: boolean }>>
+    }
+    const accounts = document.paths['/accounts']
+    if (!accounts?.get) throw new Error('fixture assumption: GET /accounts exists')
+    accounts.get.deprecated = true
+
+    const commands = await generate(prepareSpecForCli(document))
+    expect(commands.has('list_accounts')).toBe(false)
+    expect(commands.has('create_account')).toBe(true)
+    expect(commands.has('get_account')).toBe(true)
+  })
 })

@@ -4,6 +4,7 @@ export {
   constrainPathParameters,
   flattenObjectQueryParameters,
   isContractRequest,
+  omitDeprecatedOperations,
   prepareSpecForCli,
   restoreObjectQueryParameters,
 } from './normalize.js'
